@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/class_model.dart';
+import '../providers/class_provider.dart';
 import '../theme/app_theme.dart';
 import 'in_class_tabs/kelas_tab.dart';
 import 'in_class_tabs/informasi_tab.dart';
@@ -31,6 +33,49 @@ class _InClassShellScreenState extends State<InClassShellScreen> {
     ];
   }
 
+  void _showLeaveClassDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Leave Class?'),
+        content: Text(
+          'Are you sure you want to leave "${widget.classData.name}"? You will need to rejoin with a class code.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: AppTheme.textTertiary)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx); // close dialog
+              final classProvider = Provider.of<ClassProvider>(context, listen: false);
+              final success = await classProvider.leaveClass(widget.classData.id);
+              if (mounted) {
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('You have left the class.')),
+                  );
+                  Navigator.pop(context); // go back to classes list
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to leave class. Try again.')),
+                  );
+                }
+              }
+            },
+            child: const Text('Leave'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -40,6 +85,27 @@ class _InClassShellScreenState extends State<InClassShellScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'leave') {
+                _showLeaveClassDialog();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'leave',
+                child: Row(
+                  children: [
+                    Icon(Icons.exit_to_app, color: AppTheme.error, size: 20),
+                    SizedBox(width: 8),
+                    Text('Leave Class', style: TextStyle(color: AppTheme.error)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: IndexedStack(
         index: _currentIndex,
@@ -81,3 +147,4 @@ class _InClassShellScreenState extends State<InClassShellScreen> {
     );
   }
 }
+

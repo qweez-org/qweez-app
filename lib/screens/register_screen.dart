@@ -3,25 +3,93 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import 'main_shell_screen.dart';
-import 'register_screen.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   String _errorMessage = '';
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleRegister() async {
+    // Basic validation
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+      setState(() => _errorMessage = 'Please fill in all fields.');
+      return;
+    }
+
+    if (name.length < 2) {
+      setState(() => _errorMessage = 'Name must be at least 2 characters.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setState(() => _errorMessage = 'Password must be at least 6 characters.');
+      return;
+    }
+
+    if (password != confirmPassword) {
+      setState(() => _errorMessage = 'Passwords do not match.');
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+      _errorMessage = '';
+    });
+
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final result = await authProvider.register(name, email, password);
+
+    if (!mounted) return;
+
+    if (result == null) {
+      // Success — navigate to main shell
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MainShellScreen()),
+        (route) => false,
+      );
+    } else {
+      // Error — show message
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage = result;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-
     return Scaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text('Create Account'),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(32.0),
@@ -43,17 +111,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     )
                   ],
                 ),
-                child: const Icon(Icons.menu_book_rounded, size: 40, color: Colors.white),
+                child: const Icon(Icons.person_add_rounded, size: 40, color: Colors.white),
               ),
               const SizedBox(height: 32),
               Text(
-                'Welcome back!',
+                'Join Qweez!',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               const SizedBox(height: 8),
               Text(
-                'Log in to continue your learning journey',
+                'Create your student account to start learning',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
@@ -81,6 +149,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               TextField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Full Name',
+                  prefixIcon: Icon(Icons.person_outline),
+                ),
+                textCapitalization: TextCapitalization.words,
+              ),
+              const SizedBox(height: 16),
+              TextField(
                 controller: _emailController,
                 decoration: const InputDecoration(
                   labelText: 'Email Address',
@@ -97,45 +174,31 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 obscureText: true,
               ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _confirmPasswordController,
+                decoration: const InputDecoration(
+                  labelText: 'Confirm Password',
+                  prefixIcon: Icon(Icons.lock_outline),
+                ),
+                obscureText: true,
+              ),
               const SizedBox(height: 32),
               ElevatedButton(
-                onPressed: authProvider.isLoading
-                    ? null
-                    : () async {
-                        final success = await authProvider.login(
-                          _emailController.text,
-                          _passwordController.text,
-                        );
-                        if (success) {
-                          if (context.mounted) {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(builder: (_) => const MainShellScreen()),
-                            );
-                          }
-                        } else {
-                          setState(() {
-                            _errorMessage = 'Invalid email or password.';
-                          });
-                        }
-                      },
-                child: authProvider.isLoading
+                onPressed: _isSubmitting ? null : _handleRegister,
+                child: _isSubmitting
                     ? const SizedBox(
                         height: 20,
                         width: 20,
                         child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                       )
-                    : const Text('Log In'),
+                    : const Text('Create Account'),
               ),
               const SizedBox(height: 16),
               TextButton(
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                  );
-                },
+                onPressed: () => Navigator.pop(context),
                 child: const Text(
-                  'Don\'t have an account? Register',
+                  'Already have an account? Log In',
                   style: TextStyle(color: AppTheme.primary600),
                 ),
               ),

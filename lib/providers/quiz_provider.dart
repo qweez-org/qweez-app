@@ -5,9 +5,10 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/class_model.dart';
 import '../models/question_model.dart';
+import '../config/api_config.dart';
 
 class QuizProvider with ChangeNotifier {
-  final String baseUrl = 'http://192.168.1.15:5000/api';
+  final String baseUrl = ApiConfig.baseUrl;
 
   AttemptModel? _currentAttempt;
   List<QuestionModel> _questions = [];

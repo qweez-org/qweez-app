@@ -6,6 +6,7 @@ import 'providers/quiz_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/main_shell_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/splash_screen.dart';
 
 void main() {
   runApp(
@@ -31,9 +32,7 @@ class MainApp extends StatelessWidget {
       home: Consumer<AuthProvider>(
         builder: (context, auth, _) {
           if (auth.isInitializing) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
+            return const SplashScreen();
           }
           return auth.isAuthenticated ? const MainShellScreen() : const LoginScreen();
         },

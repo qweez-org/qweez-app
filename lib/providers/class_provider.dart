@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/class_model.dart';
+import '../config/api_config.dart';
 
 class ClassProvider with ChangeNotifier {
   List<ClassModel> _classes = [];
@@ -11,7 +12,7 @@ class ClassProvider with ChangeNotifier {
   List<ClassModel> get classes => _classes;
   bool get isLoading => _isLoading;
 
-  final String baseUrl = 'http://192.168.1.15:5000/api'; // Changed for physical device testing
+  final String baseUrl = ApiConfig.baseUrl; // Changed for physical device testing
 
   Future<String?> _getToken() async {
     final prefs = await SharedPreferences.getInstance();
@@ -105,6 +106,30 @@ class ClassProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 201) {
+        return true;
+      }
+    } catch (e) {
+      // Ignore errors
+    }
+    return false;
+  }
+
+  Future<bool> leaveClass(String classId) async {
+    try {
+      final token = await _getToken();
+      if (token == null) return false;
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/classes/$classId/leave'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        _classes.removeWhere((c) => c.id == classId);
+        notifyListeners();
         return true;
       }
     } catch (e) {

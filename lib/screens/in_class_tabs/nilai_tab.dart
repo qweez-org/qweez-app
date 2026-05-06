@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/class_model.dart';
 import '../../theme/app_theme.dart';
+import '../../../config/api_config.dart';
 
 class NilaiTab extends StatefulWidget {
   final ClassModel classData;
@@ -14,7 +15,7 @@ class NilaiTab extends StatefulWidget {
 }
 
 class _NilaiTabState extends State<NilaiTab> {
-  final String baseUrl = 'http://192.168.1.15:5000/api';
+  final String baseUrl = ApiConfig.baseUrl;
   bool _isLoading = true;
   List<Map<String, dynamic>> _quizGrades = [];
 

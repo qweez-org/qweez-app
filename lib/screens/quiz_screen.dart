@@ -5,6 +5,10 @@ import '../models/question_model.dart';
 import '../providers/quiz_provider.dart';
 import '../theme/app_theme.dart';
 import 'quiz_result_screen.dart';
+import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:shared_preferences/shared_preferences.dart';
+import '../config/api_config.dart';
+import 'live_leaderboard_screen.dart';
 
 class QuizScreen extends StatefulWidget {
   final QuizModel quiz;
@@ -18,12 +22,61 @@ class QuizScreen extends StatefulWidget {
 class _QuizScreenState extends State<QuizScreen> {
   final PageController _pageController = PageController();
   int _currentIndex = 0;
+  IO.Socket? _socket;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _startQuiz();
+      if (widget.quiz.mode == 'live') {
+        _initLiveSocket();
+      }
+    });
+  }
+
+  Future<void> _initLiveSocket() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    if (token == null) return;
+
+    final serverUrl = ApiConfig.baseUrl.replaceAll('/api', '');
+    _socket = IO.io(
+      serverUrl,
+      IO.OptionBuilder()
+          .setTransports(['websocket'])
+          .disableAutoConnect()
+          .setAuth({'token': token})
+          .build(),
+    );
+
+    _socket!.connect();
+
+    _socket!.onConnect((_) {
+      _socket!.emit('join:quiz', widget.quiz.id);
+    });
+
+    _socket!.on('live:cancelled', (_) {
+      if (mounted) {
+        _socket!.disconnect();
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Live Quiz Cancelled'),
+            content: const Text('The teacher has ended this quiz session early.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context); // Go back
+                },
+                child: const Text('OK'),
+              )
+            ],
+          ),
+        );
+      }
     });
   }
 
@@ -40,6 +93,11 @@ class _QuizScreenState extends State<QuizScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    if (_socket != null && _socket!.connected) {
+      _socket!.emit('leave:quiz', widget.quiz.id);
+      _socket!.disconnect();
+      _socket!.dispose();
+    }
     super.dispose();
   }
 
@@ -81,10 +139,21 @@ class _QuizScreenState extends State<QuizScreen> {
       final result = await provider.submitQuiz();
       if (mounted) {
         if (result != null) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => QuizResultScreen(result: result, quiz: widget.quiz)),
-          );
+          if (widget.quiz.mode == 'live') {
+            if (_socket != null) {
+              _socket!.disconnect();
+              _socket!.dispose();
+            }
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => LiveLeaderboardScreen(quiz: widget.quiz, result: result)),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (_) => QuizResultScreen(result: result, quiz: widget.quiz)),
+            );
+          }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Failed to submit quiz')),

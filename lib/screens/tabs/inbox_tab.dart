@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_theme.dart';
+import '../../config/api_config.dart';
 
 class InboxTab extends StatefulWidget {
   const InboxTab({super.key});
@@ -12,7 +13,7 @@ class InboxTab extends StatefulWidget {
 }
 
 class _InboxTabState extends State<InboxTab> {
-  final String baseUrl = 'http://192.168.1.15:5000/api';
+  final String baseUrl = ApiConfig.baseUrl;
   bool _isLoading = true;
   List<Map<String, dynamic>> _notifications = [];
   int _unreadCount = 0;

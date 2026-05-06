@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/class_model.dart';
 import '../theme/app_theme.dart';
 import 'quiz_screen.dart';
+import 'live_quiz_waiting_screen.dart';
+import '../../config/api_config.dart';
 
 class QuizDetailScreen extends StatefulWidget {
   final QuizModel quiz;
@@ -16,7 +18,7 @@ class QuizDetailScreen extends StatefulWidget {
 }
 
 class _QuizDetailScreenState extends State<QuizDetailScreen> {
-  final String baseUrl = 'http://192.168.1.15:5000/api';
+  final String baseUrl = ApiConfig.baseUrl;
   bool _isLoading = true;
   int _attemptCount = 0;
   int _attemptLimit = 1;
@@ -231,15 +233,16 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
                     onPressed: _canAttempt
                         ? () async {
                             if (widget.quiz.mode == 'live') {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('Live quizzes are not yet supported.')),
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => LiveQuizWaitingScreen(quiz: widget.quiz)),
                               );
-                              return;
+                            } else {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => QuizScreen(quiz: widget.quiz)),
+                              );
                             }
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => QuizScreen(quiz: widget.quiz)),
-                            );
                             // Refresh info after returning
                             _loadQuizInfo();
                           }
