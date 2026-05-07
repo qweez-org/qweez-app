@@ -5,13 +5,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 import '../models/class_model.dart';
-import '../models/quiz_model.dart';
+import '../models/question_model.dart';
 import '../theme/app_theme.dart';
 import '../config/api_config.dart';
 
 class LiveLeaderboardScreen extends StatefulWidget {
   final QuizModel quiz;
-  final AttemptModel result;
+  final Map<String, dynamic> result;
 
   const LiveLeaderboardScreen({super.key, required this.quiz, required this.result});
 
@@ -143,7 +143,8 @@ class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
 
   Widget _buildPodiumItem(Map<String, dynamic> data, int rank, double height) {
     final user = data['user'] ?? {};
-    final isCurrentUser = user['_id'] == widget.result.id; // Or compare with AuthProvider user id
+    final attempt = widget.result['attempt'] ?? {};
+    final isCurrentUser = user['_id'] == attempt['studentId']; 
     final name = user['name'] ?? 'Unknown';
     final score = data['score']?.toString() ?? '0';
 
