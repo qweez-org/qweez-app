@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/class_model.dart';
 import '../models/question_model.dart';
 import '../config/api_config.dart';
+import '../services/token_service.dart';
 
 class QuizProvider with ChangeNotifier {
   final String baseUrl = ApiConfig.baseUrl;
@@ -26,25 +26,20 @@ class QuizProvider with ChangeNotifier {
   String? get errorMessage => _errorMessage;
   int get remainingSeconds => _remainingSeconds;
 
-  Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
-  }
-
   Future<bool> startQuiz(QuizModel quiz) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
 
     try {
-      final token = await _getToken();
+      final token = await TokenService.getToken();
       if (token == null) throw Exception('Not authenticated');
 
       // 1. Start or resume attempt
       final startRes = await http.post(
         Uri.parse('$baseUrl/attempts/quizzes/${quiz.id}/start'),
         headers: {'Authorization': 'Bearer $token'},
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (startRes.statusCode != 200 && startRes.statusCode != 201) {
         final errorMsg = json.decode(startRes.body)['message'] ?? 'Failed to start quiz';
@@ -58,7 +53,7 @@ class QuizProvider with ChangeNotifier {
       final attemptRes = await http.get(
         Uri.parse('$baseUrl/attempts/${_currentAttempt!.id}'),
         headers: {'Authorization': 'Bearer $token'},
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (attemptRes.statusCode == 200) {
         final attemptData = json.decode(attemptRes.body);
@@ -72,7 +67,7 @@ class QuizProvider with ChangeNotifier {
       final questionsRes = await http.get(
         Uri.parse('$baseUrl/quizzes/${quiz.id}/questions'),
         headers: {'Authorization': 'Bearer $token'},
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (questionsRes.statusCode == 200) {
         final questionsData = json.decode(questionsRes.body);
@@ -89,7 +84,7 @@ class QuizProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      _errorMessage = e.toString();
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
       _isLoading = false;
       notifyListeners();
       return false;
@@ -126,7 +121,7 @@ class QuizProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await _getToken();
+      final token = await TokenService.getToken();
       if (token == null || _currentAttempt == null) return;
 
       await http.put(
@@ -140,9 +135,10 @@ class QuizProvider with ChangeNotifier {
             {'questionId': questionId, 'answer': answer}
           ]
         }),
-      );
+      ).timeout(const Duration(seconds: 10));
     } catch (e) {
-      print('Failed to save answer to server: $e');
+      // Save locally even if network fails — answer is already in _answers map
+      debugPrint('Failed to sync answer to server: $e');
     }
   }
 
@@ -152,13 +148,13 @@ class QuizProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await _getToken();
+      final token = await TokenService.getToken();
       if (token == null || _currentAttempt == null) throw Exception('Not authenticated');
 
       final res = await http.post(
         Uri.parse('$baseUrl/attempts/${_currentAttempt!.id}/submit'),
         headers: {'Authorization': 'Bearer $token'},
-      );
+      ).timeout(const Duration(seconds: 15));
 
       _isLoading = false;
       notifyListeners();
@@ -168,9 +164,12 @@ class QuizProvider with ChangeNotifier {
         _currentAttempt = AttemptModel.fromJson(data['attempt']);
         return data; // contains totalPoints, earnedPoints
       } else {
+        _errorMessage = 'Failed to submit quiz';
+        notifyListeners();
         return null;
       }
     } catch (e) {
+      _errorMessage = 'Network error while submitting';
       _isLoading = false;
       notifyListeners();
       return null;

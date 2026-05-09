@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../config/api_config.dart';
+import '../services/token_service.dart';
 
 class AuthProvider with ChangeNotifier {
   User? _user;
@@ -22,8 +22,7 @@ class AuthProvider with ChangeNotifier {
   Future<void> loadUser() async {
     _isInitializing = true;
 
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('token');
+    _token = await TokenService.getToken();
     if (_token != null) {
       try {
         final response = await http.get(
@@ -34,11 +33,11 @@ class AuthProvider with ChangeNotifier {
           _user = User.fromJson(json.decode(response.body)['user']);
         } else {
           _token = null;
-          await prefs.remove('token');
+          await TokenService.removeToken();
         }
       } catch (e) {
         _token = null;
-        await prefs.remove('token');
+        await TokenService.removeToken();
       }
     }
 
@@ -62,15 +61,14 @@ class AuthProvider with ChangeNotifier {
         _token = data['token'];
         _user = User.fromJson(data['user']);
 
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', _token!);
+        await TokenService.setToken(_token!);
 
         _isLoading = false;
         notifyListeners();
         return true;
       }
     } catch (e) {
-      print('LOGIN ERROR: $e');
+      debugPrint('LOGIN ERROR: $e');
     }
 
     _isLoading = false;
@@ -99,8 +97,7 @@ class AuthProvider with ChangeNotifier {
         _token = data['token'];
         _user = User.fromJson(data['user']);
 
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('token', _token!);
+        await TokenService.setToken(_token!);
 
         _isLoading = false;
         notifyListeners();
@@ -115,7 +112,7 @@ class AuthProvider with ChangeNotifier {
         return 'Registration failed. Please try again.';
       }
     } catch (e) {
-      print('REGISTER ERROR: $e');
+      debugPrint('REGISTER ERROR: $e');
       _isLoading = false;
       notifyListeners();
       return 'Network error. Check your connection.';
@@ -125,8 +122,7 @@ class AuthProvider with ChangeNotifier {
   Future<void> logout() async {
     _token = null;
     _user = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('token');
+    await TokenService.removeToken();
     notifyListeners();
   }
 }
