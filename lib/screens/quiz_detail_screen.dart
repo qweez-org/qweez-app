@@ -235,7 +235,7 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
                             if (widget.quiz.mode == 'live') {
                               await Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => LiveQuizWaitingScreen(quiz: widget.quiz)),
+                                MaterialPageRoute(builder: (_) => const LiveQuizWaitingScreen()),
                               );
                             } else {
                               await Navigator.push(

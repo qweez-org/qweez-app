@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
+import '../providers/class_provider.dart';
+import '../services/live_quiz_service.dart';
 import 'tabs/classes_tab.dart';
 import 'tabs/join_class_tab.dart';
 import 'tabs/inbox_tab.dart';
@@ -14,6 +17,8 @@ class MainShellScreen extends StatefulWidget {
 
 class _MainShellScreenState extends State<MainShellScreen> {
   int _currentIndex = 0;
+  final LiveQuizService _liveQuizService = LiveQuizService();
+  bool _socketInitialized = false;
 
   final List<Widget> _tabs = [
     const ClassesTab(),
@@ -21,6 +26,38 @@ class _MainShellScreenState extends State<MainShellScreen> {
     const InboxTab(),
     const ProfileTab(),
   ];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _initSocketIfNeeded();
+  }
+
+  void _initSocketIfNeeded() {
+    if (_socketInitialized) return;
+    _socketInitialized = true;
+
+    // Connect the live quiz socket and join class rooms after classes load
+    _liveQuizService.connect(context).then((_) {
+      final classProvider = Provider.of<ClassProvider>(context, listen: false);
+      // If classes are already loaded, join their rooms
+      if (classProvider.classes.isNotEmpty) {
+        _liveQuizService.joinAllClassRooms(classProvider.classes);
+      }
+      // Also listen for future class list changes
+      classProvider.addListener(() {
+        if (classProvider.classes.isNotEmpty) {
+          _liveQuizService.joinAllClassRooms(classProvider.classes);
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _liveQuizService.disconnect();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

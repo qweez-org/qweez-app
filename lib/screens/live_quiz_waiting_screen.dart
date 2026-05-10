@@ -1,153 +1,206 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
-import '../models/class_model.dart';
-import '../theme/app_theme.dart';
 import '../config/api_config.dart';
-import 'quiz_screen.dart';
+import '../services/token_service.dart';
+import '../theme/app_theme.dart';
+import 'live_quiz_screen.dart';
 
+/// Screen where students enter a PIN to join a live quiz.
+/// Flow: PIN input → socket student_join → wait for join_success → lobby → quiz_started → navigate
 class LiveQuizWaitingScreen extends StatefulWidget {
-  final QuizModel quiz;
+  /// Optional pre-filled PIN (from live:started notification)
+  final String? initialPin;
 
-  const LiveQuizWaitingScreen({super.key, required this.quiz});
+  const LiveQuizWaitingScreen({super.key, this.initialPin});
 
   @override
   State<LiveQuizWaitingScreen> createState() => _LiveQuizWaitingScreenState();
 }
 
 class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
-  late IO.Socket _socket;
-  bool _isLoading = true;
+  final TextEditingController _pinController = TextEditingController();
+  io.Socket? _socket;
+
+  // UI state
+  bool _isConnecting = false;
+  bool _isInLobby = false;
   String? _errorMessage;
+  String? _quizTitle;
   int _participantCount = 0;
+  List<Map<String, dynamic>> _participants = [];
 
   @override
   void initState() {
     super.initState();
-    _initLiveSession();
+    if (widget.initialPin != null && widget.initialPin!.isNotEmpty) {
+      _pinController.text = widget.initialPin!;
+      // Auto-join if PIN provided
+      WidgetsBinding.instance.addPostFrameCallback((_) => _joinSession());
+    }
   }
 
-  Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
-  }
+  Future<void> _joinSession() async {
+    final pin = _pinController.text.trim();
+    if (pin.length != 6) {
+      setState(() => _errorMessage = 'PIN harus 6 digit');
+      return;
+    }
 
-  Future<void> _initLiveSession() async {
-    try {
-      final token = await _getToken();
-      if (token == null) {
-        setState(() => _errorMessage = 'Authentication error');
-        return;
-      }
+    setState(() {
+      _isConnecting = true;
+      _errorMessage = null;
+    });
 
-      // 1. Join via REST API
-      final res = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/quizzes/${widget.quiz.id}/live/join'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 10));
-
-      if (res.statusCode != 200) {
-        setState(() {
-          _errorMessage = json.decode(res.body)['message'] ?? 'Failed to join live session.';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final data = json.decode(res.body);
+    final token = await TokenService.getToken();
+    if (token == null) {
       setState(() {
-        _participantCount = data['participantCount'] ?? 1;
+        _errorMessage = 'Authentication error. Please login again.';
+        _isConnecting = false;
       });
+      return;
+    }
 
-      // 2. Connect Socket.IO
-      final serverUrl = ApiConfig.baseUrl.replaceAll('/api', '');
-      _socket = IO.io(
-        serverUrl,
-        IO.OptionBuilder()
-            .setTransports(['websocket'])
-            .disableAutoConnect()
-            .setAuth({'token': token})
-            .build(),
-      );
+    // Get user name for display — server will use authenticated user name
 
-      _socket.connect();
+    final serverUrl = ApiConfig.baseUrl.replaceAll('/api', '');
 
-      _socket.onConnect((_) {
-        print('Socket connected');
-        _socket.emit('join:quiz', widget.quiz.id);
-        if (mounted) {
-          setState(() => _isLoading = false);
-        }
+    _socket = io.io(
+      serverUrl,
+      io.OptionBuilder()
+          .setTransports(['websocket'])
+          .disableAutoConnect()
+          .setAuth({'token': token})
+          .build(),
+    );
+
+    _socket!.onConnect((_) {
+      debugPrint('🔌 LiveQuiz: Socket connected, joining with PIN $pin');
+      _socket!.emit('student_join', {
+        'pin': pin,
+        'displayName': '', // Server will use authenticated user name
       });
+    });
 
-      _socket.onConnectError((err) {
-        print('Socket connection error: $err');
-      });
-
-      _socket.on('live:participant_joined', (data) {
-        if (mounted) {
-          setState(() {
-            _participantCount = data['count'];
-          });
-        }
-      });
-
-      _socket.on('live:begin', (data) {
-        if (mounted) {
-          _socket.disconnect(); // Disconnect from waiting room
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (_) => QuizScreen(quiz: widget.quiz)),
-          );
-        }
-      });
-
-      _socket.on('live:cancelled', (_) {
-        if (mounted) {
-          _socket.disconnect();
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Session Cancelled'),
-              content: const Text('The teacher has cancelled this live quiz session.'),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(ctx); // Close dialog
-                    Navigator.pop(context); // Go back
-                  },
-                  child: const Text('OK'),
-                )
-              ],
-            ),
-          );
-        }
-      });
-
-    } catch (e) {
+    _socket!.onConnectError((err) {
+      debugPrint('🔌 LiveQuiz: Connection error: $err');
       if (mounted) {
         setState(() {
-          _errorMessage = 'Network error. Could not join session.';
-          _isLoading = false;
+          _errorMessage = 'Gagal terhubung ke server.';
+          _isConnecting = false;
         });
       }
-    }
+    });
+
+    // ── Socket Event Handlers ──────────────────────────────────────────────
+
+    _socket!.on('join_success', (data) {
+      debugPrint('✅ Join success: $data');
+      if (mounted) {
+        setState(() {
+          _isInLobby = true;
+          _isConnecting = false;
+          _quizTitle = data['quizTitle'] ?? 'Live Quiz';
+          _participantCount = data['participantCount'] ?? 1;
+        });
+      }
+    });
+
+    _socket!.on('join_error', (data) {
+      debugPrint('❌ Join error: $data');
+      if (mounted) {
+        setState(() {
+          _errorMessage = data['message'] ?? 'Gagal bergabung.';
+          _isConnecting = false;
+        });
+        _socket?.disconnect();
+        _socket?.dispose();
+        _socket = null;
+      }
+    });
+
+    _socket!.on('participant_joined', (data) {
+      if (mounted) {
+        setState(() {
+          _participantCount = data['participantCount'] ?? _participantCount;
+          _participants = List<Map<String, dynamic>>.from(data['participants'] ?? []);
+        });
+      }
+    });
+
+    _socket!.on('participant_left', (data) {
+      if (mounted) {
+        setState(() {
+          _participantCount = data['participantCount'] ?? _participantCount;
+        });
+      }
+    });
+
+    _socket!.on('quiz_started', (data) {
+      debugPrint('🚀 Quiz started! Navigating to quiz screen');
+      if (mounted) {
+        // Navigate to the live quiz question screen, pass socket and session data
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => LiveQuizScreen(
+              socket: _socket!,
+              pin: pin,
+              quizTitle: _quizTitle ?? 'Live Quiz',
+              firstQuestion: data,
+            ),
+          ),
+        );
+      }
+    });
+
+    _socket!.on('session_cancelled', (data) {
+      if (mounted) {
+        _socket?.disconnect();
+        _socket?.dispose();
+        _socket = null;
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Sesi Dibatalkan'),
+            content: const Text('Guru telah membatalkan sesi live quiz ini.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  Navigator.pop(context);
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    });
+
+    _socket!.on('teacher_disconnected', (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Guru terputus. Menunggu koneksi ulang...'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    });
+
+    _socket!.connect();
   }
 
   @override
   void dispose() {
-    if (_socket.connected) {
-      _socket.emit('leave:quiz', widget.quiz.id);
-      _socket.disconnect();
+    _pinController.dispose();
+    // Only disconnect if we're still in the lobby (not navigated to quiz)
+    if (_isInLobby && _socket != null) {
+      _socket?.disconnect();
+      _socket?.dispose();
     }
-    _socket.dispose();
     super.dispose();
   }
 
@@ -156,90 +209,230 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
     return Scaffold(
       backgroundColor: AppTheme.primary50,
       appBar: AppBar(
-        title: const Text('Live Quiz Waiting Room'),
+        title: const Text('Live Quiz'),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
       body: Center(
-        child: _isLoading
-            ? Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(height: 24),
-                  Text('Connecting to live session...', style: TextStyle(color: AppTheme.textSecondary)),
-                ],
-              )
-            : _errorMessage != null
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
-                      const SizedBox(height: 16),
-                      Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 16)),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Go Back'),
-                      ),
-                    ],
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(24),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: const Icon(Icons.bolt, size: 80, color: Colors.orange),
-                      ),
-                      const SizedBox(height: 32),
-                      Text(
-                        widget.quiz.title,
-                        style: Theme.of(context).textTheme.headlineMedium,
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Waiting for the teacher to start...',
-                        style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
-                      ),
-                      const SizedBox(height: 48),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          border: Border.all(color: AppTheme.primary200),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.group, color: AppTheme.primary600),
-                            const SizedBox(width: 12),
-                            Text(
-                              '$_participantCount students waiting',
-                              style: const TextStyle(
-                                color: AppTheme.primary700,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: _isInLobby ? _buildLobby() : _buildPinEntry(),
+        ),
       ),
+    );
+  }
+
+  Widget _buildPinEntry() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Icon
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.bolt, size: 64, color: Colors.orange),
+        ),
+        const SizedBox(height: 32),
+        Text(
+          'Masukkan PIN',
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Masukkan 6 digit PIN dari guru untuk bergabung',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 32),
+
+        // PIN Input
+        SizedBox(
+          width: 240,
+          child: TextField(
+            controller: _pinController,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 12,
+              fontFamily: 'monospace',
+            ),
+            decoration: InputDecoration(
+              hintText: '000000',
+              hintStyle: TextStyle(
+                color: Colors.grey.shade300,
+                fontSize: 32,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 12,
+              ),
+              counterText: '',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: AppTheme.primary200, width: 2),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: const BorderSide(color: AppTheme.primary500, width: 2),
+              ),
+              filled: true,
+              fillColor: Colors.white,
+              contentPadding: const EdgeInsets.symmetric(vertical: 20),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Error message
+        if (_errorMessage != null) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              _errorMessage!,
+              style: TextStyle(color: Colors.red.shade700, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // Join button
+        SizedBox(
+          width: 240,
+          child: ElevatedButton(
+            onPressed: _isConnecting ? null : _joinSession,
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: _isConnecting
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Text('Bergabung', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLobby() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        // Quiz title
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.05),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: const Icon(Icons.bolt, size: 80, color: Colors.orange),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          _quizTitle ?? 'Live Quiz',
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Menunggu guru memulai kuis...',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 16),
+        ),
+        const SizedBox(height: 32),
+
+        // Participant count
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: AppTheme.primary200),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.group, color: AppTheme.primary600, size: 28),
+              const SizedBox(width: 12),
+              Text(
+                '$_participantCount siswa bergabung',
+                style: const TextStyle(
+                  color: AppTheme.primary700,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 18,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // Participant chips
+        if (_participants.isNotEmpty)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: _participants.map((p) {
+              return Chip(
+                avatar: CircleAvatar(
+                  backgroundColor: AppTheme.primary100,
+                  child: Text(
+                    (p['displayName'] as String? ?? '?')[0].toUpperCase(),
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary700),
+                  ),
+                ),
+                label: Text(p['displayName'] ?? 'Siswa'),
+                backgroundColor: Colors.white,
+                side: const BorderSide(color: AppTheme.primary100),
+              );
+            }).toList(),
+          ),
+
+        const SizedBox(height: 32),
+
+        // Loading indicator
+        const SizedBox(
+          width: 24,
+          height: 24,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'PIN: ${_pinController.text}',
+          style: TextStyle(
+            color: AppTheme.textTertiary,
+            fontSize: 14,
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }
