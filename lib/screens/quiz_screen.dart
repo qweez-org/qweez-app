@@ -6,9 +6,9 @@ import '../providers/quiz_provider.dart';
 import '../theme/app_theme.dart';
 import 'quiz_result_screen.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 import 'live_leaderboard_screen.dart';
+import '../services/token_service.dart';
 
 class QuizScreen extends StatefulWidget {
   final QuizModel quiz;
@@ -36,8 +36,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Future<void> _initLiveSocket() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
+    final token = await TokenService.getAccessToken();
     if (token == null) return;
 
     final serverUrl = ApiConfig.baseUrl.replaceAll('/api', '');

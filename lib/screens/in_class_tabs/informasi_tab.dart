@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/class_model.dart';
 import '../../theme/app_theme.dart';
 import '../../../config/api_config.dart';
+import '../../services/token_service.dart';
 
 class InformasiTab extends StatefulWidget {
   final ClassModel classData;
@@ -27,15 +27,10 @@ class _InformasiTabState extends State<InformasiTab> {
     _loadMembers();
   }
 
-  Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
-  }
-
   Future<void> _loadMembers() async {
     setState(() => _isLoading = true);
     try {
-      final token = await _getToken();
+      final token = await TokenService.getAccessToken();
       if (token == null) return;
 
       final res = await http.get(

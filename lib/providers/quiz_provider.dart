@@ -32,7 +32,7 @@ class QuizProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await TokenService.getToken();
+      final token = await TokenService.getAccessToken();
       if (token == null) throw Exception('Not authenticated');
 
       // 1. Start or resume attempt
@@ -121,7 +121,7 @@ class QuizProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await TokenService.getToken();
+      final token = await TokenService.getAccessToken();
       if (token == null || _currentAttempt == null) return;
 
       await http.put(
@@ -148,7 +148,7 @@ class QuizProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await TokenService.getToken();
+      final token = await TokenService.getAccessToken();
       if (token == null || _currentAttempt == null) throw Exception('Not authenticated');
 
       final res = await http.post(

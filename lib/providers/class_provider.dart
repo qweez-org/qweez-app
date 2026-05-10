@@ -28,7 +28,7 @@ class ClassProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await TokenService.getToken();
+      final token = await TokenService.getAccessToken();
       if (token == null) {
         _errorMessage = 'Not authenticated';
         _isLoading = false;
@@ -58,7 +58,7 @@ class ClassProvider with ChangeNotifier {
 
   Future<List<TopicModel>> fetchTopics(String classId) async {
     try {
-      final token = await TokenService.getToken();
+      final token = await TokenService.getAccessToken();
       if (token == null) return [];
 
       final response = await http.get(
@@ -80,7 +80,7 @@ class ClassProvider with ChangeNotifier {
 
   Future<List<QuizModel>> fetchQuizzesForTopic(String topicId) async {
     try {
-      final token = await TokenService.getToken();
+      final token = await TokenService.getAccessToken();
       if (token == null) return [];
 
       final response = await http.get(
@@ -102,7 +102,7 @@ class ClassProvider with ChangeNotifier {
 
   Future<bool> joinClass(String code) async {
     try {
-      final token = await TokenService.getToken();
+      final token = await TokenService.getAccessToken();
       if (token == null) return false;
 
       final response = await http.post(
@@ -130,7 +130,7 @@ class ClassProvider with ChangeNotifier {
 
   Future<bool> leaveClass(String classId) async {
     try {
-      final token = await TokenService.getToken();
+      final token = await TokenService.getAccessToken();
       if (token == null) return false;
 
       final response = await http.post(

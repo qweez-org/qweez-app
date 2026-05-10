@@ -7,37 +7,95 @@ import '../services/token_service.dart';
 
 class AuthProvider with ChangeNotifier {
   User? _user;
-  String? _token;
+  String? _accessToken;
+  String? _refreshToken;
   bool _isInitializing = true;  // For app startup token check
   bool _isLoading = false;       // For login button state only
 
   User? get user => _user;
-  String? get token => _token;
-  bool get isAuthenticated => _token != null;
+  String? get token => _accessToken;
+  bool get isAuthenticated => _accessToken != null;
   bool get isInitializing => _isInitializing;
   bool get isLoading => _isLoading;
 
   final String baseUrl = ApiConfig.baseUrl;
 
+  Future<bool> _refreshAccessToken() async {
+    final rt = _refreshToken ?? await TokenService.getRefreshToken();
+    if (rt == null) return false;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'refreshToken': rt}),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final newAccess = data['accessToken'] as String?;
+        final newRefresh = data['refreshToken'] as String?;
+        if (newAccess == null) return false;
+
+        _accessToken = newAccess;
+        if (newRefresh != null) {
+          _refreshToken = newRefresh;
+          await TokenService.setTokens(accessToken: newAccess, refreshToken: newRefresh);
+        } else {
+          await TokenService.setAccessToken(newAccess);
+        }
+
+        return true;
+      }
+    } catch (e) {
+      debugPrint('REFRESH ERROR: $e');
+    }
+
+    return false;
+  }
+
   Future<void> loadUser() async {
     _isInitializing = true;
 
-    _token = await TokenService.getToken();
-    if (_token != null) {
+    _accessToken = await TokenService.getAccessToken();
+    _refreshToken = await TokenService.getRefreshToken();
+
+    if (_accessToken != null) {
       try {
         final response = await http.get(
           Uri.parse('$baseUrl/auth/me'),
-          headers: {'Authorization': 'Bearer $_token'},
+          headers: {'Authorization': 'Bearer $_accessToken'},
         ).timeout(const Duration(seconds: 10));
         if (response.statusCode == 200) {
           _user = User.fromJson(json.decode(response.body)['user']);
+        } else if (response.statusCode == 401 && _refreshToken != null) {
+          final ok = await _refreshAccessToken();
+          if (ok) {
+            final retry = await http.get(
+              Uri.parse('$baseUrl/auth/me'),
+              headers: {'Authorization': 'Bearer $_accessToken'},
+            ).timeout(const Duration(seconds: 10));
+            if (retry.statusCode == 200) {
+              _user = User.fromJson(json.decode(retry.body)['user']);
+            } else {
+              _accessToken = null;
+              _refreshToken = null;
+              await TokenService.clearTokens();
+            }
+          } else {
+            _accessToken = null;
+            _refreshToken = null;
+            await TokenService.clearTokens();
+          }
         } else {
-          _token = null;
-          await TokenService.removeToken();
+          _accessToken = null;
+          _refreshToken = null;
+          await TokenService.clearTokens();
         }
       } catch (e) {
-        _token = null;
-        await TokenService.removeToken();
+        _accessToken = null;
+        _refreshToken = null;
+        await TokenService.clearTokens();
       }
     }
 
@@ -58,10 +116,13 @@ class AuthProvider with ChangeNotifier {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        _token = data['token'];
+        _accessToken = data['accessToken'];
+        _refreshToken = data['refreshToken'];
         _user = User.fromJson(data['user']);
 
-        await TokenService.setToken(_token!);
+        if (_accessToken != null && _refreshToken != null) {
+          await TokenService.setTokens(accessToken: _accessToken!, refreshToken: _refreshToken!);
+        }
 
         _isLoading = false;
         notifyListeners();
@@ -94,10 +155,13 @@ class AuthProvider with ChangeNotifier {
 
       if (response.statusCode == 201) {
         final data = json.decode(response.body);
-        _token = data['token'];
+        _accessToken = data['accessToken'];
+        _refreshToken = data['refreshToken'];
         _user = User.fromJson(data['user']);
 
-        await TokenService.setToken(_token!);
+        if (_accessToken != null && _refreshToken != null) {
+          await TokenService.setTokens(accessToken: _accessToken!, refreshToken: _refreshToken!);
+        }
 
         _isLoading = false;
         notifyListeners();
@@ -120,9 +184,27 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
-    _token = null;
+    try {
+      final rt = _refreshToken ?? await TokenService.getRefreshToken();
+      final at = _accessToken ?? await TokenService.getAccessToken();
+      if (at != null) {
+        await http.post(
+          Uri.parse('$baseUrl/auth/logout'),
+          headers: {
+            'Authorization': 'Bearer $at',
+            'Content-Type': 'application/json',
+          },
+          body: json.encode({'refreshToken': rt}),
+        ).timeout(const Duration(seconds: 10));
+      }
+    } catch (_) {
+      // ignore
+    }
+
+    _accessToken = null;
+    _refreshToken = null;
     _user = null;
-    await TokenService.removeToken();
+    await TokenService.clearTokens();
     notifyListeners();
   }
 }

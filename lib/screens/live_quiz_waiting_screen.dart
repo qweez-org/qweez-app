@@ -52,7 +52,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
       _errorMessage = null;
     });
 
-    final token = await TokenService.getToken();
+    final token = await TokenService.getAccessToken();
     if (token == null) {
       setState(() {
         _errorMessage = 'Authentication error. Please login again.';

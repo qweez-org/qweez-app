@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/app_theme.dart';
 import '../../config/api_config.dart';
+import '../../services/token_service.dart';
 
 class InboxTab extends StatefulWidget {
   const InboxTab({super.key});
@@ -24,15 +24,10 @@ class _InboxTabState extends State<InboxTab> {
     _loadNotifications();
   }
 
-  Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
-  }
-
   Future<void> _loadNotifications() async {
     setState(() => _isLoading = true);
     try {
-      final token = await _getToken();
+      final token = await TokenService.getAccessToken();
       if (token == null) return;
       final res = await http.get(
         Uri.parse('$baseUrl/notifications'),
@@ -50,7 +45,7 @@ class _InboxTabState extends State<InboxTab> {
 
   Future<void> _markAsRead(String id) async {
     try {
-      final token = await _getToken();
+      final token = await TokenService.getAccessToken();
       if (token == null) return;
       await http.post(
         Uri.parse('$baseUrl/notifications/$id/read'),

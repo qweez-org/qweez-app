@@ -15,7 +15,7 @@ class LiveQuizService {
   Future<void> connect(BuildContext context) async {
     _context = context;
 
-    final token = await TokenService.getToken();
+    final token = await TokenService.getAccessToken();
     if (token == null) return;
 
     final serverUrl = ApiConfig.baseUrl.replaceAll('/api', '');
