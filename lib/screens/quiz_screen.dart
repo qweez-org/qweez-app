@@ -290,7 +290,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   ),
                   child: Row(
                     children: [
-                      if (_currentIndex > 0)
+                      if (_currentIndex > 0 && widget.quiz.allowBacktrack)
                         Expanded(
                           child: OutlinedButton(
                             onPressed: _previousPage,

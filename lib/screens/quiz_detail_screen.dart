@@ -213,7 +213,7 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
                                 const Text('Your Last Score', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${_lastAttemptResult!['earnedPoints'] ?? '-'} / ${_lastAttemptResult!['totalPoints'] ?? '-'} pts',
+                                  '${_lastAttemptResult!['earnedPoints'] ?? _lastAttemptResult!['score'] ?? '-'} / ${_lastAttemptResult!['totalPoints'] ?? '-'} pts',
                                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primary700),
                                 ),
                               ],

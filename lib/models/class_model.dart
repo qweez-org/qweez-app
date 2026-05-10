@@ -80,6 +80,7 @@ class QuizModel {
   final int? questionCount;
   final DateTime? scheduledOpen;
   final DateTime? scheduledClose;
+  final bool allowBacktrack;
 
   QuizModel({
     required this.id,
@@ -92,6 +93,7 @@ class QuizModel {
     this.questionCount,
     this.scheduledOpen,
     this.scheduledClose,
+    this.allowBacktrack = true,
   });
 
   factory QuizModel.fromJson(Map<String, dynamic> json) {
@@ -106,6 +108,7 @@ class QuizModel {
       questionCount: json['questionCount'],
       scheduledOpen: json['scheduledOpen'] != null ? DateTime.tryParse(json['scheduledOpen']) : null,
       scheduledClose: json['scheduledClose'] != null ? DateTime.tryParse(json['scheduledClose']) : null,
+      allowBacktrack: json['allowBacktrack'] ?? true,
     );
   }
 }

@@ -12,7 +12,7 @@ class QuizResultScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final attempt = result['attempt'];
     final totalPoints = result['totalPoints'] ?? 0;
-    final earnedPoints = result['earnedPoints'] ?? 0;
+    final earnedPoints = result['earnedPoints'] ?? result['score'] ?? 0;
     final status = attempt['status'];
 
     final bool isPending = status == 'submitted' && result['needsManualGrading'] == true;

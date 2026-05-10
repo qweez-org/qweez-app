@@ -47,7 +47,7 @@ class _RiwayatTabState extends State<RiwayatTab> {
           return {
             'quizTitle': quiz is Map ? (quiz['title'] ?? 'Quiz') : 'Quiz',
             'totalPoints': a['totalPoints'] ?? 0,
-            'earnedPoints': a['earnedPoints'] ?? 0,
+            'earnedPoints': a['earnedPoints'] ?? a['score'] ?? 0,
             'submittedAt': a['submittedAt'],
           };
         }).toList();

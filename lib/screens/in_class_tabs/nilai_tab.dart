@@ -49,7 +49,7 @@ class _NilaiTabState extends State<NilaiTab> {
         for (final g in grades) {
           final qid = g['quizId'] is Map ? g['quizId']['_id'] : g['quizId'];
           final qTitle = g['quizId'] is Map ? (g['quizId']['title'] ?? 'Quiz') : 'Quiz';
-          final earned = g['earnedPoints'] ?? 0;
+          final earned = g['earnedPoints'] ?? g['score'] ?? 0;
           if (!bestByQuiz.containsKey(qid) || earned > (bestByQuiz[qid]!['earned'] ?? 0)) {
             bestByQuiz[qid] = {'title': qTitle, 'earned': earned, 'total': g['totalPoints'] ?? 0};
           }
