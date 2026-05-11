@@ -11,12 +11,14 @@ class AuthProvider with ChangeNotifier {
   String? _refreshToken;
   bool _isInitializing = true;  // For app startup token check
   bool _isLoading = false;       // For login button state only
+  String? _authError;
 
   User? get user => _user;
   String? get token => _accessToken;
-  bool get isAuthenticated => _accessToken != null;
+  bool get isAuthenticated => _accessToken != null && _user != null && _user!.role == 'student';
   bool get isInitializing => _isInitializing;
   bool get isLoading => _isLoading;
+  String? get authError => _authError;
 
   final String baseUrl = ApiConfig.baseUrl;
 
@@ -56,6 +58,7 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> loadUser() async {
     _isInitializing = true;
+    _authError = null;
 
     _accessToken = await TokenService.getAccessToken();
     _refreshToken = await TokenService.getRefreshToken();
@@ -68,6 +71,13 @@ class AuthProvider with ChangeNotifier {
         ).timeout(const Duration(seconds: 10));
         if (response.statusCode == 200) {
           _user = User.fromJson(json.decode(response.body)['user']);
+          if (_user?.role != 'student') {
+            _accessToken = null;
+            _refreshToken = null;
+            _user = null;
+            _authError = 'This app is for students only. Please use a student account.';
+            await TokenService.clearTokens();
+          }
         } else if (response.statusCode == 401 && _refreshToken != null) {
           final ok = await _refreshAccessToken();
           if (ok) {
@@ -77,6 +87,13 @@ class AuthProvider with ChangeNotifier {
             ).timeout(const Duration(seconds: 10));
             if (retry.statusCode == 200) {
               _user = User.fromJson(json.decode(retry.body)['user']);
+              if (_user?.role != 'student') {
+                _accessToken = null;
+                _refreshToken = null;
+                _user = null;
+                _authError = 'This app is for students only. Please use a student account.';
+                await TokenService.clearTokens();
+              }
             } else {
               _accessToken = null;
               _refreshToken = null;
@@ -105,13 +122,14 @@ class AuthProvider with ChangeNotifier {
 
   Future<bool> login(String email, String password) async {
     _isLoading = true;
+    _authError = null;
     notifyListeners();
 
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'email': email, 'password': password}),
+        body: json.encode({'email': email, 'password': password, 'role': 'student'}),
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
@@ -119,6 +137,17 @@ class AuthProvider with ChangeNotifier {
         _accessToken = data['accessToken'];
         _refreshToken = data['refreshToken'];
         _user = User.fromJson(data['user']);
+
+        if (_user?.role != 'student') {
+          _accessToken = null;
+          _refreshToken = null;
+          _user = null;
+          _authError = 'This app is for students only. Please use a student account.';
+          await TokenService.clearTokens();
+          _isLoading = false;
+          notifyListeners();
+          return false;
+        }
 
         if (_accessToken != null && _refreshToken != null) {
           await TokenService.setTokens(accessToken: _accessToken!, refreshToken: _refreshToken!);
@@ -133,6 +162,7 @@ class AuthProvider with ChangeNotifier {
     }
 
     _isLoading = false;
+    _authError = 'Invalid email or password.';
     notifyListeners();
     return false;
   }
