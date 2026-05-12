@@ -20,6 +20,7 @@ class _InformasiTabState extends State<InformasiTab> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _students = [];
   List<Map<String, dynamic>> _coTeachers = [];
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -61,7 +62,7 @@ class _InformasiTabState extends State<InformasiTab> {
         }
       }
     } catch (e) {
-      // Ignore
+      _errorMessage = 'Failed to load class info. Check your connection.';
     }
     if (mounted) setState(() => _isLoading = false);
   }
@@ -128,6 +129,21 @@ class _InformasiTabState extends State<InformasiTab> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red.shade200),
+            const SizedBox(height: 16),
+            Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSecondary)),
+            const SizedBox(height: 16),
+            ElevatedButton(onPressed: _loadMembers, child: const Text('Retry')),
+          ]),
+        ),
+      );
     }
 
     return RefreshIndicator(

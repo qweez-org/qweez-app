@@ -17,6 +17,7 @@ class _InboxTabState extends State<InboxTab> {
   bool _isLoading = true;
   List<Map<String, dynamic>> _notifications = [];
   int _unreadCount = 0;
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -39,7 +40,9 @@ class _InboxTabState extends State<InboxTab> {
         _notifications = notifs.cast<Map<String, dynamic>>();
         _unreadCount = data['unreadCount'] ?? 0;
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      _errorMessage = 'Failed to load notifications. Check your connection.';
+    }
     if (mounted) setState(() => _isLoading = false);
   }
 
@@ -52,7 +55,13 @@ class _InboxTabState extends State<InboxTab> {
         headers: {'Authorization': 'Bearer $token'},
       );
       _loadNotifications();
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to mark as read')),
+        );
+      }
+    }
   }
 
   String _formatDate(String? dateStr) {
@@ -107,7 +116,20 @@ class _InboxTabState extends State<InboxTab> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _notifications.isEmpty
+          : _errorMessage != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      Icon(Icons.error_outline, size: 64, color: Colors.red.shade200),
+                      const SizedBox(height: 16),
+                      Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSecondary)),
+                      const SizedBox(height: 16),
+                      ElevatedButton(onPressed: _loadNotifications, child: const Text('Retry')),
+                    ]),
+                  ),
+                )
+              : _notifications.isEmpty
               ? Center(
                   child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                     Icon(Icons.notifications_none, size: 80, color: AppTheme.primary200),

@@ -66,7 +66,11 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
         }
       }
     } catch (e) {
-      // Ignore
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load quiz info. Check your connection.')),
+        );
+      }
     }
 
     if (mounted) {

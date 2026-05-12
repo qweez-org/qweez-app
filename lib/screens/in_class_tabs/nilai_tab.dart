@@ -18,6 +18,7 @@ class _NilaiTabState extends State<NilaiTab> {
   final String baseUrl = ApiConfig.baseUrl;
   bool _isLoading = true;
   List<Map<String, dynamic>> _quizGrades = [];
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -60,13 +61,29 @@ class _NilaiTabState extends State<NilaiTab> {
 
         _quizGrades = bestByQuiz.values.toList();
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      _errorMessage = 'Failed to load grades. Check your connection.';
+    }
     if (mounted) setState(() => _isLoading = false);
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red.shade200),
+            const SizedBox(height: 16),
+            Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSecondary)),
+            const SizedBox(height: 16),
+            ElevatedButton(onPressed: _loadGrades, child: const Text('Retry')),
+          ]),
+        ),
+      );
+    }
     if (_quizGrades.isEmpty) {
       return Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [

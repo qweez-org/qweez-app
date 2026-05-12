@@ -18,6 +18,7 @@ class _RiwayatTabState extends State<RiwayatTab> {
   final String baseUrl = ApiConfig.baseUrl;
   bool _isLoading = true;
   List<Map<String, dynamic>> _attempts = [];
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -47,7 +48,9 @@ class _RiwayatTabState extends State<RiwayatTab> {
           };
         }).toList();
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      _errorMessage = 'Failed to load attempts. Check your connection.';
+    }
     if (mounted) setState(() => _isLoading = false);
   }
 
@@ -62,6 +65,20 @@ class _RiwayatTabState extends State<RiwayatTab> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_errorMessage != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.red.shade200),
+            const SizedBox(height: 16),
+            Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSecondary)),
+            const SizedBox(height: 16),
+            ElevatedButton(onPressed: _loadAttempts, child: const Text('Retry')),
+          ]),
+        ),
+      );
+    }
     if (_attempts.isEmpty) {
       return Center(
         child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
