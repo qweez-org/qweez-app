@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 
 import '../models/class_model.dart';
-import '../models/question_model.dart';
 import '../theme/app_theme.dart';
 import '../config/api_config.dart';
 import '../services/token_service.dart';
@@ -77,7 +76,7 @@ class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
     _socket = IO.io(
       serverUrl,
       IO.OptionBuilder()
-          .setTransports(['websocket'])
+          .setTransports(['websocket', 'polling'])
           .disableAutoConnect()
           .setAuth({'token': token})
           .build(),
@@ -144,9 +143,9 @@ class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
     final score = data['score']?.toString() ?? '0';
 
     Color rankColor;
-    if (rank == 1) rankColor = Colors.amber;
-    else if (rank == 2) rankColor = Colors.grey.shade300;
-    else rankColor = Colors.brown.shade300;
+    if (rank == 1) rankColor = const Color(0xFFFACC15); // gold
+    else if (rank == 2) rankColor = AppTheme.gray300; // silver
+    else rankColor = const Color(0xFFCD7F32); // bronze
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -169,7 +168,7 @@ class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
               topRight: Radius.circular(16),
             ),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -5))
+              BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, -5))
             ],
           ),
           child: Column(
@@ -178,12 +177,12 @@ class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
               const SizedBox(height: 16),
               Text(
                 '#$rank',
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.black87),
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
               ),
               const SizedBox(height: 8),
               Text(
                 '$score pts',
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.black54),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppTheme.textSecondary),
               ),
             ],
           ),
@@ -207,16 +206,17 @@ class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
           )
         ],
       ),
-      body: _isLoading
+      body: SafeArea(
+        child: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _errorMessage != null
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      const Icon(Icons.error_outline, size: 64, color: AppTheme.error),
                       const SizedBox(height: 16),
-                      Text(_errorMessage!, style: const TextStyle(color: Colors.red, fontSize: 16)),
+                      Text(_errorMessage!, style: const TextStyle(color: AppTheme.error, fontSize: 16)),
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () => Navigator.pop(context),
@@ -259,6 +259,7 @@ class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
                     ),
                   ],
                 ),
+      ),
     );
   }
 }

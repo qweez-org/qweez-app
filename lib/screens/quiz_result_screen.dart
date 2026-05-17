@@ -22,23 +22,24 @@ class QuizResultScreen extends StatelessWidget {
         title: const Text('Quiz Result'),
         automaticallyImplyLeading: false,
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
               Container(
                 width: 100,
                 height: 100,
                 decoration: BoxDecoration(
-                  color: isPending ? Colors.orange.shade50 : AppTheme.primary50,
+                  color: isPending ? AppTheme.warning.withValues(alpha: 0.1) : AppTheme.primary50,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   isPending ? Icons.hourglass_empty : Icons.emoji_events,
                   size: 50,
-                  color: isPending ? Colors.orange : AppTheme.primary400,
+                  color: isPending ? AppTheme.warning : AppTheme.primary400,
                 ),
               ),
               const SizedBox(height: 32),
@@ -61,8 +62,8 @@ class QuizResultScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '$earnedPoints / $totalPoints',
-                  style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold, color: AppTheme.primary600),
+                  '$earnedPoints / $totalPoints pts (${totalPoints > 0 ? ((earnedPoints / totalPoints) * 100).round() : 0}%)',
+                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.primary600),
                 ),
               ],
               const SizedBox(height: 48),
@@ -76,7 +77,8 @@ class QuizResultScreen extends StatelessWidget {
                   child: const Text('Back to Dashboard'),
                 ),
               )
-            ],
+              ],
+            ),
           ),
         ),
       ),

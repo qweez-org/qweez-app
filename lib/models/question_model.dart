@@ -2,10 +2,12 @@ class QuestionModel {
   final String id;
   final String quizId;
   final String text;
-  final String type; // multiple_choice, essay
+  final String type; // multiple_choice, short_answer
   final int points;
   final List<OptionModel>? options;
   final int order;
+  final bool caseSensitive;
+  final bool spaceSensitive;
 
   QuestionModel({
     required this.id,
@@ -15,6 +17,8 @@ class QuestionModel {
     required this.points,
     this.options,
     required this.order,
+    this.caseSensitive = false,
+    this.spaceSensitive = false,
   });
 
   factory QuestionModel.fromJson(Map<String, dynamic> json) {
@@ -28,6 +32,8 @@ class QuestionModel {
           ? (json['options'] as List).map((o) => OptionModel.fromJson(o)).toList()
           : null,
       order: json['order'] ?? 0,
+      caseSensitive: json['caseSensitive'] ?? false,
+      spaceSensitive: json['spaceSensitive'] ?? false,
     );
   }
 }

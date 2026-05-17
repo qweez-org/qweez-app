@@ -4,6 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/class_provider.dart';
 import '../../theme/app_theme.dart';
 import '../in_class_shell_screen.dart';
+import '../live_quiz_waiting_screen.dart';
 
 class ClassesTab extends StatefulWidget {
   const ClassesTab({super.key});
@@ -48,7 +49,65 @@ class _ClassesTabState extends State<ClassesTab> {
                     'Here are your enrolled classes.',
                     style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 24),
+                  // Join Live Quiz Card
+                  Card(
+                    color: AppTheme.live.withValues(alpha: 0.08),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                      side: BorderSide(color: AppTheme.live.withValues(alpha: 0.3)),
+                    ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const LiveQuizWaitingScreen()),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: AppTheme.live.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                              ),
+                              child: const Icon(Icons.bolt, color: AppTheme.live, size: 28),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Gabung Live Quiz',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.live,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Masukkan PIN dari guru untuk bergabung',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: AppTheme.live.withValues(alpha: 0.85),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right, color: AppTheme.live.withValues(alpha: 0.6)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
                   if (classProvider.classes.isEmpty)
                     Center(
                       child: Padding(
@@ -70,7 +129,7 @@ class _ClassesTabState extends State<ClassesTab> {
                     ...classProvider.classes.map((c) {
                       return Card(
                         child: InkWell(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
                           onTap: () {
                             Navigator.push(
                               context,
@@ -88,7 +147,7 @@ class _ClassesTabState extends State<ClassesTab> {
                                   height: 48,
                                   decoration: BoxDecoration(
                                     color: AppTheme.primary50,
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                                   ),
                                   child: const Icon(Icons.menu_book, color: AppTheme.primary500),
                                 ),

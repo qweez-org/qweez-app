@@ -85,10 +85,10 @@ class _InboxTabState extends State<InboxTab> {
 
   Color _typeColor(String? type) {
     switch (type) {
-      case 'join_approved': return const Color(0xFF22C55E);
-      case 'join_rejected': return Colors.red;
+      case 'join_approved': return AppTheme.success;
+      case 'join_rejected': return AppTheme.error;
       case 'quiz_new': return AppTheme.primary500;
-      case 'quiz_open': return Colors.orange;
+      case 'quiz_open': return AppTheme.warning;
       case 'quiz_closed': return AppTheme.textTertiary;
       default: return AppTheme.primary400;
     }
@@ -106,7 +106,7 @@ class _InboxTabState extends State<InboxTab> {
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(color: AppTheme.error, borderRadius: BorderRadius.circular(AppTheme.radiusMd)),
                 child: Text('$_unreadCount', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
               ),
             ],
@@ -121,7 +121,7 @@ class _InboxTabState extends State<InboxTab> {
                   child: Padding(
                     padding: const EdgeInsets.all(32),
                     child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                      Icon(Icons.error_outline, size: 64, color: Colors.red.shade200),
+                      Icon(Icons.error_outline, size: 64, color: AppTheme.error.withValues(alpha: 0.4)),
                       const SizedBox(height: 16),
                       Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSecondary)),
                       const SizedBox(height: 16),

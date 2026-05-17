@@ -1,6 +1,17 @@
 class ApiConfig {
-  // Use 10.0.2.2 for Android Emulator, localhost for iOS simulator, or your local IP for physical device testing
-  static const String baseUrl = 'http://192.168.1.15:5000/api';
-  
-  // You can add other global configuration constants here later
+  // Default for Android Emulator. Override with setBaseUrl() for physical devices.
+  static String _baseUrl = 'http://10.0.2.2:5000/api';
+
+  static String get baseUrl => _baseUrl;
+
+  /// Call this in main.dart before the app starts, e.g.:
+  ///   ApiConfig.setBaseUrl('http://192.168.1.10:5000/api');
+  static void setBaseUrl(String url) {
+    _baseUrl = url;
+  }
+
+  /// Convenience setter that only changes the host portion.
+  static void setHost(String host, {int port = 5000}) {
+    _baseUrl = 'http://$host:$port/api';
+  }
 }

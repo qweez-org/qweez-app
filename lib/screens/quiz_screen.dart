@@ -43,7 +43,7 @@ class _QuizScreenState extends State<QuizScreen> {
     _socket = IO.io(
       serverUrl,
       IO.OptionBuilder()
-          .setTransports(['websocket'])
+          .setTransports(['websocket', 'polling'])
           .disableAutoConnect()
           .setAuth({'token': token})
           .build(),
@@ -181,7 +181,7 @@ class _QuizScreenState extends State<QuizScreen> {
             content: const Text('Your progress is saved, but the timer will continue running.'),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Stay')),
-              TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Leave', style: TextStyle(color: Colors.red))),
+              TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Leave', style: TextStyle(color: AppTheme.error))),
             ],
           ),
         );
@@ -197,135 +197,140 @@ class _QuizScreenState extends State<QuizScreen> {
             onPressed: () => Navigator.maybePop(context),
           ),
         ),
-        body: Consumer<QuizProvider>(
-          builder: (context, provider, child) {
-            if (provider.isLoading && provider.questions.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
-            }
+        body: SafeArea(
+          child: Consumer<QuizProvider>(
+            builder: (context, provider, child) {
+              if (provider.isLoading && provider.questions.isEmpty) {
+                return const Center(child: CircularProgressIndicator());
+              }
 
-            if (provider.questions.isEmpty) {
-              return const Center(child: Text('No questions available.'));
-            }
+              if (provider.questions.isEmpty) {
+                return const Center(child: Text('No questions available.'));
+              }
 
-            final questions = provider.questions;
-            final isLastQuestion = _currentIndex == questions.length - 1;
+              final questions = provider.questions;
+              final isLastQuestion = _currentIndex == questions.length - 1;
 
-            return Column(
-              children: [
-                // Header (Timer & Progress)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceCard,
-                    border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Question ${_currentIndex + 1} of ${questions.length}',
-                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: provider.remainingSeconds < 60 ? Colors.red.shade50 : AppTheme.primary50,
-                          borderRadius: BorderRadius.circular(20),
+              return Column(
+                children: [
+                  // Header (Timer & Progress)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceCard,
+                      border: Border(bottom: BorderSide(color: AppTheme.gray200)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Question ${_currentIndex + 1} of ${questions.length}',
+                          style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.timer_outlined,
-                              size: 16,
-                              color: provider.remainingSeconds < 60 ? Colors.red : AppTheme.primary600,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              _formatTime(provider.remainingSeconds),
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: provider.remainingSeconds < 60 ? Colors.red : AppTheme.primary600,
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: provider.remainingSeconds < 60 ? AppTheme.error.withValues(alpha: 0.08) : AppTheme.primary50,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.timer_outlined,
+                                size: 16,
+                                color: provider.remainingSeconds < 60 ? AppTheme.error : AppTheme.primary600,
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                
-                // Linear Progress
-                LinearProgressIndicator(
-                  value: (_currentIndex + 1) / questions.length,
-                  backgroundColor: Colors.grey.shade200,
-                  valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary400),
-                ),
-
-                // Questions PageView
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pageController,
-                    physics: const NeverScrollableScrollPhysics(), // Disable swipe
-                    onPageChanged: (idx) {
-                      setState(() {
-                        _currentIndex = idx;
-                      });
-                    },
-                    itemCount: questions.length,
-                    itemBuilder: (context, index) {
-                      return _buildQuestionCard(questions[index], provider);
-                    },
-                  ),
-                ),
-
-                // Footer Navigation
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: AppTheme.surfaceCard,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, -5),
-                      )
-                    ],
-                  ),
-                  child: Row(
-                    children: [
-                      if (_currentIndex > 0 && widget.quiz.allowBacktrack)
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: _previousPage,
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              side: const BorderSide(color: AppTheme.primary400),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: const Text('Previous', style: TextStyle(color: AppTheme.primary400)),
+                              const SizedBox(width: 6),
+                              Text(
+                                _formatTime(provider.remainingSeconds),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: provider.remainingSeconds < 60 ? AppTheme.error : AppTheme.primary600,
+                                ),
+                              ),
+                            ],
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // Linear Progress
+                  LinearProgressIndicator(
+                    value: (_currentIndex + 1) / questions.length,
+                    backgroundColor: AppTheme.gray200,
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary400),
+                  ),
+
+                  // Questions PageView
+                  Expanded(
+                    child: PageView.builder(
+                      controller: _pageController,
+                      physics: const NeverScrollableScrollPhysics(), // Disable swipe
+                      onPageChanged: (idx) {
+                        setState(() {
+                          _currentIndex = idx;
+                        });
+                      },
+                      itemCount: questions.length,
+                      itemBuilder: (context, index) {
+                        return _buildQuestionCard(questions[index], provider);
+                      },
+                    ),
+                  ),
+
+                  // Footer Navigation
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceCard,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, -5),
                         )
-                      else
-                        const Spacer(),
-                      
-                      const SizedBox(width: 16),
-                      
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: isLastQuestion ? _submitQuiz : () => _nextPage(questions.length),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isLastQuestion ? Colors.black : AppTheme.primary400,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        if (_currentIndex > 0 && widget.quiz.allowBacktrack)
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _previousPage,
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                side: const BorderSide(color: AppTheme.primary400),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                              child: const Text('Previous', style: TextStyle(color: AppTheme.primary400)),
+                            ),
+                          )
+                        else
+                          const Spacer(),
+                        
+                        const SizedBox(width: 16),
+                        
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isLastQuestion ? _submitQuiz : () => _nextPage(questions.length),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isLastQuestion ? AppTheme.textPrimary : AppTheme.primary400,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: Text(
+                              isLastQuestion ? 'Submit' : 'Next',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                            ),
                           ),
-                          child: Text(isLastQuestion ? 'Submit Quiz' : 'Next'),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                )
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );
@@ -367,7 +372,7 @@ class _QuizScreenState extends State<QuizScreen> {
                     decoration: BoxDecoration(
                       color: isSelected ? AppTheme.primary50 : AppTheme.surfaceCard,
                       border: Border.all(
-                        color: isSelected ? AppTheme.primary400 : Colors.grey.shade300,
+                        color: isSelected ? AppTheme.primary400 : AppTheme.gray300,
                         width: isSelected ? 2 : 1,
                       ),
                       borderRadius: BorderRadius.circular(12),
@@ -380,7 +385,7 @@ class _QuizScreenState extends State<QuizScreen> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: isSelected ? AppTheme.primary400 : Colors.grey.shade400,
+                              color: isSelected ? AppTheme.primary400 : AppTheme.gray400,
                               width: 2,
                             ),
                           ),
@@ -414,12 +419,15 @@ class _QuizScreenState extends State<QuizScreen> {
                 ),
               );
             }).toList()
-          else if (question.type == 'essay')
+          else if (question.type == 'short_answer')
             TextFormField(
               initialValue: provider.answers[question.id],
-              maxLines: 8,
-              decoration: const InputDecoration(
-                hintText: 'Type your answer here...',
+              maxLines: 1,
+              decoration: InputDecoration(
+                hintText: 'Ketik jawaban Anda di sini...',
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                filled: true,
+                fillColor: Colors.white,
               ),
               onChanged: (val) {
                 // Save after a short delay or immediately (debounce would be better, but immediately is fine for now)

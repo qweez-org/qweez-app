@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../models/class_model.dart';
 import '../../providers/class_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/quiz_helpers.dart';
 import '../quiz_detail_screen.dart';
 
 class KelasTab extends StatefulWidget {
@@ -17,6 +18,7 @@ class KelasTab extends StatefulWidget {
 class _KelasTabState extends State<KelasTab> {
   List<TopicModel> _topics = [];
   bool _isLoading = true;
+  int _refreshKey = 0;
 
   @override
   void initState() {
@@ -31,6 +33,7 @@ class _KelasTabState extends State<KelasTab> {
       setState(() {
         _topics = topics;
         _isLoading = false;
+        _refreshKey++;
       });
     }
   }
@@ -59,7 +62,7 @@ class _KelasTabState extends State<KelasTab> {
                     padding: const EdgeInsets.all(24.0),
                     itemCount: _topics.length,
                     itemBuilder: (context, index) {
-                      return TopicCard(topic: _topics[index]);
+                      return TopicCard(key: ValueKey('${_topics[index].id}_$_refreshKey'), topic: _topics[index]);
                     },
                   ),
           );
@@ -80,7 +83,6 @@ class _TopicCardState extends State<TopicCard> {
   bool _isLoadingQuizzes = false;
 
   Future<void> _loadQuizzes() async {
-    if (_quizzes.isNotEmpty) return;
     setState(() => _isLoadingQuizzes = true);
     final provider = Provider.of<ClassProvider>(context, listen: false);
     final allQuizzes = await provider.fetchQuizzesForTopic(widget.topic.id);
@@ -89,32 +91,6 @@ class _TopicCardState extends State<TopicCard> {
         _quizzes = allQuizzes.where((q) => q.status != 'draft').toList();
         _isLoadingQuizzes = false;
       });
-    }
-  }
-
-  Color _quizStatusColor(String status) {
-    switch (status) {
-      case 'open':
-        return const Color(0xFF22C55E);
-      case 'scheduled':
-        return Colors.orange;
-      case 'closed':
-        return Colors.red;
-      default:
-        return AppTheme.textTertiary;
-    }
-  }
-
-  IconData _quizTrailingIcon(String status) {
-    switch (status) {
-      case 'open':
-        return Icons.arrow_forward_ios;
-      case 'scheduled':
-        return Icons.schedule;
-      case 'closed':
-        return Icons.lock_outline;
-      default:
-        return Icons.arrow_forward_ios;
     }
   }
 
@@ -146,20 +122,26 @@ class _TopicCardState extends State<TopicCard> {
             )
           else
             ..._quizzes.map((quiz) {
-              final statusColor = _quizStatusColor(quiz.status);
+              final statusColor = quizStatusColor(quiz.status);
               return ListTile(
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: quiz.mode == 'live' ? Colors.orange.shade50 : AppTheme.primary50,
-                    borderRadius: BorderRadius.circular(8),
+                    color: quiz.mode == 'live' ? AppTheme.warning.withValues(alpha: 0.1) : AppTheme.primary50,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                   ),
                   child: Icon(
                     quiz.mode == 'live' ? Icons.bolt : Icons.assignment,
-                    color: quiz.mode == 'live' ? Colors.orange : AppTheme.primary600,
+                    color: quiz.mode == 'live' ? AppTheme.live : AppTheme.primary600,
                   ),
                 ),
-                title: Text(quiz.title),
+                title: Row(
+                  children: [
+                    Expanded(child: Text(quiz.title)),
+                    if (quiz.isCompleted == true)
+                      const Icon(Icons.check_circle, color: AppTheme.success, size: 20),
+                  ],
+                ),
                 subtitle: Row(
                   children: [
                     Text('${quiz.duration} mins • '),
@@ -170,13 +152,13 @@ class _TopicCardState extends State<TopicCard> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        quiz.status.toUpperCase(),
+                        quizStatusLabel(quiz.status),
                         style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600),
                       ),
                     ),
                   ],
                 ),
-                trailing: Icon(_quizTrailingIcon(quiz.status), color: AppTheme.textTertiary, size: 18),
+                trailing: Icon(quizTrailingIcon(quiz.status), color: AppTheme.textTertiary, size: 18),
                 onTap: () {
                   Navigator.push(
                     context,

@@ -39,6 +39,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
 
     // Connect the live quiz socket and join class rooms after classes load
     _liveQuizService.connect(context).then((_) {
+      if (!mounted) return;
       final classProvider = Provider.of<ClassProvider>(context, listen: false);
       // If classes are already loaded, join their rooms
       if (classProvider.classes.isNotEmpty) {
@@ -46,6 +47,7 @@ class _MainShellScreenState extends State<MainShellScreen> {
       }
       // Also listen for future class list changes
       classProvider.addListener(() {
+        if (!mounted) return;
         if (classProvider.classes.isNotEmpty) {
           _liveQuizService.joinAllClassRooms(classProvider.classes);
         }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../models/class_model.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/quiz_helpers.dart';
 import '../../../config/api_config.dart';
 import '../../services/token_service.dart';
 
@@ -75,7 +76,7 @@ class _NilaiTabState extends State<NilaiTab> {
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red.shade200),
+            Icon(Icons.error_outline, size: 64, color: AppTheme.error.withValues(alpha: 0.4)),
             const SizedBox(height: 16),
             Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSecondary)),
             const SizedBox(height: 16),
@@ -107,7 +108,7 @@ class _NilaiTabState extends State<NilaiTab> {
                 1: FlexColumnWidth(2),
                 2: FlexColumnWidth(1.5),
               },
-              border: TableBorder.symmetric(inside: BorderSide(color: Colors.grey.shade200)),
+              border: TableBorder.symmetric(inside: BorderSide(color: AppTheme.gray200)),
               children: [
                 TableRow(
                   decoration: BoxDecoration(color: AppTheme.primary50),
@@ -126,7 +127,7 @@ class _NilaiTabState extends State<NilaiTab> {
                     Padding(padding: const EdgeInsets.all(12), child: Text(g['title'], style: const TextStyle(fontSize: 13))),
                     Padding(padding: const EdgeInsets.all(12), child: Text(hasScore ? '$earned/$total' : '-', style: const TextStyle(fontSize: 13))),
                     Padding(padding: const EdgeInsets.all(12), child: Text(pct != null ? '$pct%' : '-', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                      color: pct == null ? AppTheme.textTertiary : pct >= 70 ? const Color(0xFF22C55E) : pct >= 40 ? Colors.orange : Colors.red))),
+                      color: pct == null ? AppTheme.textTertiary : scoreBandColor(pct.toDouble())))),
                   ]);
                 }),
               ],

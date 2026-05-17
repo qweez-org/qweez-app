@@ -81,6 +81,10 @@ class QuizModel {
   final DateTime? scheduledOpen;
   final DateTime? scheduledClose;
   final bool allowBacktrack;
+  final bool? isCompleted;
+  final bool? isLiveSessionOpen;
+  final bool shuffleQuestions;
+  final bool shuffleOptions;
 
   QuizModel({
     required this.id,
@@ -94,6 +98,10 @@ class QuizModel {
     this.scheduledOpen,
     this.scheduledClose,
     this.allowBacktrack = true,
+    this.isCompleted,
+    this.isLiveSessionOpen,
+    this.shuffleQuestions = false,
+    this.shuffleOptions = false,
   });
 
   factory QuizModel.fromJson(Map<String, dynamic> json) {
@@ -109,6 +117,10 @@ class QuizModel {
       scheduledOpen: json['scheduledOpen'] != null ? DateTime.tryParse(json['scheduledOpen']) : null,
       scheduledClose: json['scheduledClose'] != null ? DateTime.tryParse(json['scheduledClose']) : null,
       allowBacktrack: json['allowBacktrack'] ?? true,
+      isCompleted: json['isCompleted'],
+      isLiveSessionOpen: json['isLiveSessionOpen'],
+      shuffleQuestions: json['shuffleQuestions'] ?? false,
+      shuffleOptions: json['shuffleOptions'] ?? false,
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/class_model.dart';
 import '../theme/app_theme.dart';
+import '../utils/quiz_helpers.dart';
 import 'quiz_screen.dart';
 import 'live_quiz_waiting_screen.dart';
 import '../../config/api_config.dart';
@@ -22,6 +23,7 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
   bool _isLoading = true;
   int _attemptCount = 0;
   int _attemptLimit = 1;
+  bool _isLiveSessionOpen = false;
   Map<String, dynamic>? _lastAttemptResult;
 
   @override
@@ -46,6 +48,7 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
       if (quizRes.statusCode == 200) {
         final quizData = json.decode(quizRes.body)['quiz'];
         _attemptLimit = quizData['attemptLimit'] ?? 1;
+        _isLiveSessionOpen = quizData['isLiveSessionOpen'] ?? false;
       }
 
       // Fetch user's attempts for this quiz
@@ -79,42 +82,35 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
   }
 
   bool get _canAttempt {
+    if (widget.quiz.mode == 'live') {
+      if (widget.quiz.status == 'finished' || widget.quiz.status == 'closed') return false;
+      return _isLiveSessionOpen;
+    }
+    // Regular quizzes
     if (widget.quiz.status != 'open') return false;
     if (_attemptCount >= _attemptLimit) return false;
     return true;
   }
 
-  String get _statusLabel {
-    switch (widget.quiz.status) {
-      case 'draft':
-        return 'Draft';
-      case 'scheduled':
-        return 'Scheduled';
-      case 'open':
-        return 'Open';
-      case 'closed':
-        return 'Closed';
-      default:
-        return widget.quiz.status.toUpperCase();
-    }
-  }
+  String get _statusLabel => quizStatusLabel(widget.quiz.status);
 
-  Color get _statusColor {
-    switch (widget.quiz.status) {
-      case 'open':
-        return const Color(0xFF22C55E);
-      case 'scheduled':
-        return Colors.orange;
-      case 'closed':
-        return Colors.red;
-      default:
-        return AppTheme.textTertiary;
-    }
-  }
+  Color get _statusColor => quizStatusColor(widget.quiz.status);
 
   String _formatDate(DateTime? dt) {
     if (dt == null) return '-';
-    return '${dt.day}/${dt.month}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    final local = dt.toLocal();
+    return '${local.day}/${local.month}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  }
+
+  String _formatRemaining(DateTime? closeAt) {
+    if (closeAt == null) return '-';
+    final now = DateTime.now();
+    if (closeAt.isBefore(now)) return 'Sudah ditutup';
+    final diff = closeAt.difference(now);
+    final hours = diff.inHours;
+    final minutes = diff.inMinutes % 60;
+    if (hours > 0) return '${hours}j ${minutes}m';
+    return '${minutes}m';
   }
 
   @override
@@ -159,16 +155,16 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
+                          color: AppTheme.live.withValues(alpha: 0.08),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.orange.shade200),
+                          border: Border.all(color: AppTheme.live.withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.bolt, size: 14, color: Colors.orange.shade700),
+                            Icon(Icons.bolt, size: 14, color: AppTheme.live),
                             const SizedBox(width: 4),
-                            Text('Live', style: TextStyle(color: Colors.orange.shade700, fontWeight: FontWeight.w600, fontSize: 13)),
+                            Text('Live', style: TextStyle(color: AppTheme.live, fontWeight: FontWeight.w600, fontSize: 13)),
                           ],
                         ),
                       ),
@@ -182,10 +178,19 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
                 _buildInfoCard(Icons.repeat, 'Attempts', '$_attemptCount / $_attemptLimit used'),
                 if (widget.quiz.questionCount != null)
                   _buildInfoCard(Icons.help_outline, 'Questions', '${widget.quiz.questionCount}'),
+                if (widget.quiz.mode != 'live')
+                  _buildInfoCard(
+                    widget.quiz.allowBacktrack ? Icons.arrow_back : Icons.block,
+                    'Revisi jawaban',
+                    widget.quiz.allowBacktrack ? 'Ya (bisa kembali)' : 'Tidak (jawaban terkunci)',
+                  ),
                 if (widget.quiz.scheduledOpen != null)
                   _buildInfoCard(Icons.event, 'Opens', _formatDate(widget.quiz.scheduledOpen)),
                 if (widget.quiz.scheduledClose != null)
                   _buildInfoCard(Icons.event_busy, 'Closes', _formatDate(widget.quiz.scheduledClose)),
+                if (widget.quiz.mode == 'scheduled' && widget.quiz.scheduledClose != null) ...[
+                  _buildInfoCard(Icons.hourglass_bottom, 'Sisa waktu', _formatRemaining(widget.quiz.scheduledClose)),
+                ],
                 if (widget.quiz.description != null && widget.quiz.description!.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Text('Description', style: Theme.of(context).textTheme.titleMedium),
@@ -212,7 +217,7 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
                                 const Text('Your Last Score', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${_lastAttemptResult!['earnedPoints'] ?? _lastAttemptResult!['score'] ?? '-'} / ${_lastAttemptResult!['totalPoints'] ?? '-'} pts',
+                                  '${_lastAttemptResult!['earnedPoints'] ?? _lastAttemptResult!['score'] ?? '-'} / ${_lastAttemptResult!['totalPoints'] ?? '-'} pts (${_lastAttemptResult!['totalPoints'] != null && _lastAttemptResult!['totalPoints'] > 0 ? (((_lastAttemptResult!['earnedPoints'] ?? _lastAttemptResult!['score'] ?? 0) / _lastAttemptResult!['totalPoints']) * 100).round() : 0}%)',
                                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primary700),
                                 ),
                               ],
@@ -254,9 +259,11 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
                           ? 'Attempt Limit Reached'
                           : widget.quiz.status == 'scheduled'
                               ? 'Quiz Not Yet Open'
-                              : widget.quiz.status == 'closed'
-                                  ? 'Quiz Closed'
-                                  : 'Start Quiz',
+                              : (widget.quiz.status == 'closed' || widget.quiz.status == 'finished')
+                                  ? (widget.quiz.mode == 'live' ? 'Sesi Selesai' : 'Quiz Closed')
+                                  : widget.quiz.mode == 'live'
+                                      ? (_isLiveSessionOpen ? 'Join Live Quiz' : 'Menunggu Sesi Dimulai')
+                                      : 'Start Quiz',
                     ),
                   ),
                 ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../models/class_model.dart';
 import '../../theme/app_theme.dart';
+import '../../utils/quiz_helpers.dart';
 import '../../../config/api_config.dart';
 import '../../services/token_service.dart';
 
@@ -70,7 +71,7 @@ class _RiwayatTabState extends State<RiwayatTab> {
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.error_outline, size: 64, color: Colors.red.shade200),
+            Icon(Icons.error_outline, size: 64, color: AppTheme.error.withValues(alpha: 0.4)),
             const SizedBox(height: 16),
             Text(_errorMessage!, textAlign: TextAlign.center, style: const TextStyle(color: AppTheme.textSecondary)),
             const SizedBox(height: 16),
@@ -106,17 +107,36 @@ class _RiwayatTabState extends State<RiwayatTab> {
                 Container(
                   width: 52, height: 52,
                   decoration: BoxDecoration(
-                    color: (pct >= 70 ? const Color(0xFF22C55E) : pct >= 40 ? Colors.orange : Colors.red).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
+                    color: scoreBandColor(pct.toDouble()).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                   ),
-                  child: Center(child: Text('$pct%', style: TextStyle(fontWeight: FontWeight.bold, color: pct >= 70 ? const Color(0xFF22C55E) : pct >= 40 ? Colors.orange : Colors.red))),
+                  child: Center(child: Text('$pct%', style: TextStyle(fontWeight: FontWeight.bold, color: scoreBandColor(pct.toDouble())))),
                 ),
                 const SizedBox(width: 16),
                 Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(a['quizTitle'], style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
                   const SizedBox(height: 4),
-                  Text('$earned / $total pts • ${_formatDate(a['submittedAt'])}', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+                  Text(_formatDate(a['submittedAt']), style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
                 ])),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${a['earnedPoints']} / ${a['totalPoints']} pts',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      '${a['totalPoints'] > 0 ? ((a['earnedPoints'] / a['totalPoints']) * 100).round() : 0}%',
+                      style: TextStyle(
+                        color: AppTheme.textTertiary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
               ]),
             ),
           );

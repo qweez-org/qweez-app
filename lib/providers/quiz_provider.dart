@@ -73,6 +73,15 @@ class QuizProvider with ChangeNotifier {
         final questionsData = json.decode(questionsRes.body);
         final List<dynamic> questionsList = questionsData['questions'] ?? [];
         _questions = questionsList.map((q) => QuestionModel.fromJson(q)).toList();
+
+        if (quiz.shuffleOptions) {
+          for (var q in _questions) {
+            q.options?.shuffle();
+          }
+        }
+        if (quiz.shuffleQuestions) {
+          _questions.shuffle();
+        }
       } else {
         throw Exception('Failed to load questions');
       }
@@ -138,7 +147,7 @@ class QuizProvider with ChangeNotifier {
       ).timeout(const Duration(seconds: 10));
     } catch (e) {
       // Save locally even if network fails — answer is already in _answers map
-      debugPrint('Failed to sync answer to server: $e');
+
     }
   }
 

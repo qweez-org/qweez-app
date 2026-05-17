@@ -60,38 +60,44 @@ class AuthProvider with ChangeNotifier {
     _isInitializing = true;
     _authError = null;
 
-    _accessToken = await TokenService.getAccessToken();
-    _refreshToken = await TokenService.getRefreshToken();
+    try {
+      _accessToken = await TokenService.getAccessToken();
+      _refreshToken = await TokenService.getRefreshToken();
 
-    if (_accessToken != null) {
-      try {
-        final response = await http.get(
-          Uri.parse('$baseUrl/auth/me'),
-          headers: {'Authorization': 'Bearer $_accessToken'},
-        ).timeout(const Duration(seconds: 10));
-        if (response.statusCode == 200) {
-          _user = User.fromJson(json.decode(response.body)['user']);
-          if (_user?.role != 'student') {
-            _accessToken = null;
-            _refreshToken = null;
-            _user = null;
-            _authError = 'This app is for students only. Please use a student account.';
-            await TokenService.clearTokens();
-          }
-        } else if (response.statusCode == 401 && _refreshToken != null) {
-          final ok = await _refreshAccessToken();
-          if (ok) {
-            final retry = await http.get(
-              Uri.parse('$baseUrl/auth/me'),
-              headers: {'Authorization': 'Bearer $_accessToken'},
-            ).timeout(const Duration(seconds: 10));
-            if (retry.statusCode == 200) {
-              _user = User.fromJson(json.decode(retry.body)['user']);
-              if (_user?.role != 'student') {
+      if (_accessToken != null) {
+        try {
+          final response = await http.get(
+            Uri.parse('$baseUrl/auth/me'),
+            headers: {'Authorization': 'Bearer $_accessToken'},
+          ).timeout(const Duration(seconds: 10));
+          if (response.statusCode == 200) {
+            _user = User.fromJson(json.decode(response.body)['user']);
+            if (_user?.role != 'student') {
+              _accessToken = null;
+              _refreshToken = null;
+              _user = null;
+              _authError = 'This app is for students only. Please use a student account.';
+              await TokenService.clearTokens();
+            }
+          } else if (response.statusCode == 401 && _refreshToken != null) {
+            final ok = await _refreshAccessToken();
+            if (ok) {
+              final retry = await http.get(
+                Uri.parse('$baseUrl/auth/me'),
+                headers: {'Authorization': 'Bearer $_accessToken'},
+              ).timeout(const Duration(seconds: 10));
+              if (retry.statusCode == 200) {
+                _user = User.fromJson(json.decode(retry.body)['user']);
+                if (_user?.role != 'student') {
+                  _accessToken = null;
+                  _refreshToken = null;
+                  _user = null;
+                  _authError = 'This app is for students only. Please use a student account.';
+                  await TokenService.clearTokens();
+                }
+              } else {
                 _accessToken = null;
                 _refreshToken = null;
-                _user = null;
-                _authError = 'This app is for students only. Please use a student account.';
                 await TokenService.clearTokens();
               }
             } else {
@@ -104,16 +110,17 @@ class AuthProvider with ChangeNotifier {
             _refreshToken = null;
             await TokenService.clearTokens();
           }
-        } else {
+        } catch (e) {
+          debugPrint('LOADUSER HTTP ERROR: $e');
           _accessToken = null;
           _refreshToken = null;
           await TokenService.clearTokens();
         }
-      } catch (e) {
-        _accessToken = null;
-        _refreshToken = null;
-        await TokenService.clearTokens();
       }
+    } catch (e) {
+      debugPrint('LOADUSER TOKEN ERROR: $e');
+      _accessToken = null;
+      _refreshToken = null;
     }
 
     _isInitializing = false;

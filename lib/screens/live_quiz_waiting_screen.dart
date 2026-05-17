@@ -25,6 +25,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
   // UI state
   bool _isConnecting = false;
   bool _isInLobby = false;
+  bool _isNavigatingToQuiz = false;
   String? _errorMessage;
   String? _quizTitle;
   int _participantCount = 0;
@@ -68,14 +69,14 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
     _socket = io.io(
       serverUrl,
       io.OptionBuilder()
-          .setTransports(['websocket'])
+          .setTransports(['websocket', 'polling'])
           .disableAutoConnect()
           .setAuth({'token': token})
           .build(),
     );
 
     _socket!.onConnect((_) {
-      debugPrint('🔌 LiveQuiz: Socket connected, joining with PIN $pin');
+
       _socket!.emit('student_join', {
         'pin': pin,
         'displayName': '', // Server will use authenticated user name
@@ -83,10 +84,10 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
     });
 
     _socket!.onConnectError((err) {
-      debugPrint('🔌 LiveQuiz: Connection error: $err');
+
       if (mounted) {
         setState(() {
-          _errorMessage = 'Gagal terhubung ke server.';
+          _errorMessage = 'Gagal terhubung ke server. Pastikan koneksi internet & WiFi yang sama.\n($err)';
           _isConnecting = false;
         });
       }
@@ -95,7 +96,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
     // ── Socket Event Handlers ──────────────────────────────────────────────
 
     _socket!.on('join_success', (data) {
-      debugPrint('✅ Join success: $data');
+
       if (mounted) {
         setState(() {
           _isInLobby = true;
@@ -107,7 +108,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
     });
 
     _socket!.on('join_error', (data) {
-      debugPrint('❌ Join error: $data');
+
       if (mounted) {
         setState(() {
           _errorMessage = data['message'] ?? 'Gagal bergabung.';
@@ -137,9 +138,35 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
     });
 
     _socket!.on('quiz_started', (data) {
-      debugPrint('🚀 Quiz started! Navigating to quiz screen');
+
       if (mounted) {
-        // Navigate to the live quiz question screen, pass socket and session data
+        final allQuestions = (data['allQuestions'] as List?)
+            ?.map((q) => Map<String, dynamic>.from(q as Map))
+            .toList() ?? [];
+        final totalDurationSec = data['totalDurationSec'] ?? 0;
+        final allowBacktrack = data['allowBacktrack'] ?? true;
+        final shuffleQuestions = data['shuffleQuestions'] ?? false;
+        final shuffleOptions = data['shuffleOptions'] ?? false;
+        
+        final existingAnswers = data['existingAnswers'] != null
+            ? Map<String, dynamic>.from(data['existingAnswers'] as Map)
+            : <String, dynamic>{};
+
+        for (var i = 0; i < allQuestions.length; i++) {
+          allQuestions[i]['_originalIndex'] = i;
+          if (shuffleOptions && allQuestions[i]['options'] != null) {
+            final options = List<Map<String, dynamic>>.from(allQuestions[i]['options']);
+            options.shuffle();
+            allQuestions[i]['options'] = options;
+          }
+        }
+
+        if (shuffleQuestions) {
+          allQuestions.shuffle();
+        }
+
+        // Navigate to the live quiz screen with all questions and total timer
+        _isNavigatingToQuiz = true;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
@@ -147,7 +174,10 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
               socket: _socket!,
               pin: pin,
               quizTitle: _quizTitle ?? 'Live Quiz',
-              firstQuestion: data,
+              allQuestions: allQuestions,
+              totalDurationSec: totalDurationSec,
+              allowBacktrack: allowBacktrack,
+              existingAnswers: existingAnswers,
             ),
           ),
         );
@@ -184,7 +214,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('⚠️ Guru terputus. Menunggu koneksi ulang...'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppTheme.warning,
           ),
         );
       }
@@ -197,7 +227,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
   void dispose() {
     _pinController.dispose();
     // Only disconnect if we're still in the lobby (not navigated to quiz)
-    if (_isInLobby && _socket != null) {
+    if (_isInLobby && !_isNavigatingToQuiz && _socket != null) {
       _socket?.disconnect();
       _socket?.dispose();
     }
@@ -213,10 +243,12 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: _isInLobby ? _buildLobby() : _buildPinEntry(),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).padding.bottom),
+            child: _isInLobby ? _buildLobby() : _buildPinEntry(),
+          ),
         ),
       ),
     );
@@ -230,7 +262,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
         Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppTheme.surfaceCard,
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
@@ -240,7 +272,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
               ),
             ],
           ),
-          child: const Icon(Icons.bolt, size: 64, color: Colors.orange),
+          child: const Icon(Icons.bolt, size: 64, color: AppTheme.live),
         ),
         const SizedBox(height: 32),
         Text(
@@ -272,7 +304,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
             decoration: InputDecoration(
               hintText: '000000',
               hintStyle: TextStyle(
-                color: Colors.grey.shade300,
+                color: AppTheme.gray300,
                 fontSize: 32,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 12,
@@ -287,7 +319,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
                 borderSide: const BorderSide(color: AppTheme.primary500, width: 2),
               ),
               filled: true,
-              fillColor: Colors.white,
+              fillColor: AppTheme.surfaceCard,
               contentPadding: const EdgeInsets.symmetric(vertical: 20),
             ),
           ),
@@ -299,12 +331,12 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              borderRadius: BorderRadius.circular(8),
+              color: AppTheme.error.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
             ),
             child: Text(
               _errorMessage!,
-              style: TextStyle(color: Colors.red.shade700, fontSize: 14),
+              style: TextStyle(color: AppTheme.error, fontSize: 14),
               textAlign: TextAlign.center,
             ),
           ),
