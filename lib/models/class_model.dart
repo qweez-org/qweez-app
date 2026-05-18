@@ -85,6 +85,8 @@ class QuizModel {
   final bool? isLiveSessionOpen;
   final bool shuffleQuestions;
   final bool shuffleOptions;
+  final int? attemptLimit;
+  final bool showAnswerKey;
 
   QuizModel({
     required this.id,
@@ -102,6 +104,8 @@ class QuizModel {
     this.isLiveSessionOpen,
     this.shuffleQuestions = false,
     this.shuffleOptions = false,
+    this.attemptLimit,
+    this.showAnswerKey = false,
   });
 
   factory QuizModel.fromJson(Map<String, dynamic> json) {
@@ -121,6 +125,8 @@ class QuizModel {
       isLiveSessionOpen: json['isLiveSessionOpen'],
       shuffleQuestions: json['shuffleQuestions'] ?? false,
       shuffleOptions: json['shuffleOptions'] ?? false,
+      attemptLimit: json['attemptLimit'],
+      showAnswerKey: json['showAnswerKey'] ?? false,
     );
   }
 }

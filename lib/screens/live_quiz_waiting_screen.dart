@@ -71,12 +71,13 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
       io.OptionBuilder()
           .setTransports(['websocket', 'polling'])
           .disableAutoConnect()
+          .enableForceNew()
           .setAuth({'token': token})
           .build(),
     );
 
     _socket!.onConnect((_) {
-
+      debugPrint('[LiveQuiz] Socket connected, emitting student_join with pin=$pin');
       _socket!.emit('student_join', {
         'pin': pin,
         'displayName': '', // Server will use authenticated user name
@@ -84,13 +85,17 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
     });
 
     _socket!.onConnectError((err) {
-
+      debugPrint('[LiveQuiz] Socket connect error: $err');
       if (mounted) {
         setState(() {
           _errorMessage = 'Gagal terhubung ke server. Pastikan koneksi internet & WiFi yang sama.\n($err)';
           _isConnecting = false;
         });
       }
+    });
+
+    _socket!.onDisconnect((_) {
+      debugPrint('[LiveQuiz] Socket disconnected');
     });
 
     // ── Socket Event Handlers ──────────────────────────────────────────────

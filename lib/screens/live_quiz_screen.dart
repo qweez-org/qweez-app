@@ -469,85 +469,86 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          ...options.asMap().entries.map((optEntry) {
-            final optIdx = optEntry.key;
-            final option = optEntry.value;
-            final optText = option['text'] ?? '';
-            final isSelected = _selectedAnswers[qIndex] == optText;
-            final letter = String.fromCharCode(65 + optIdx);
+          if (question['type'] != 'short_answer')
+            ...options.asMap().entries.map((optEntry) {
+              final optIdx = optEntry.key;
+              final option = optEntry.value;
+              final optText = option['text'] ?? '';
+              final isSelected = _selectedAnswers[qIndex] == optText;
+              final letter = String.fromCharCode(65 + optIdx);
 
-            return GestureDetector(
-              onTap: isSubmitted ? null : () => _selectAnswer(qIndex, optText),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isSubmitted
-                      ? (isSelected ? AppTheme.success.withValues(alpha: 0.08) : AppTheme.gray100)
-                      : (isSelected ? AppTheme.primary50 : AppTheme.gray50),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                  border: Border.all(
+              return GestureDetector(
+                onTap: isSubmitted ? null : () => _selectAnswer(qIndex, optText),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
                     color: isSubmitted
-                        ? (isSelected ? AppTheme.success : AppTheme.gray300)
-                        : (isSelected ? AppTheme.primary500 : AppTheme.gray300),
-                    width: isSelected ? 2 : 1,
+                        ? (isSelected ? AppTheme.success.withValues(alpha: 0.08) : AppTheme.gray100)
+                        : (isSelected ? AppTheme.primary50 : AppTheme.gray50),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                    border: Border.all(
+                      color: isSubmitted
+                          ? (isSelected ? AppTheme.success : AppTheme.gray300)
+                          : (isSelected ? AppTheme.primary500 : AppTheme.gray300),
+                      width: isSelected ? 2 : 1,
+                    ),
                   ),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: isSubmitted
-                            ? (isSelected ? AppTheme.success : AppTheme.gray200)
-                            : (isSelected ? AppTheme.primary500 : AppTheme.surfaceCard),
-                        shape: BoxShape.circle,
-                        border: Border.all(
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
                           color: isSubmitted
-                              ? (isSelected ? AppTheme.success : AppTheme.gray400)
-                              : (isSelected ? AppTheme.primary500 : AppTheme.gray400),
-                          width: 2,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          letter,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
+                              ? (isSelected ? AppTheme.success : AppTheme.gray200)
+                              : (isSelected ? AppTheme.primary500 : AppTheme.surfaceCard),
+                          shape: BoxShape.circle,
+                          border: Border.all(
                             color: isSubmitted
-                                ? (isSelected ? Colors.white : AppTheme.gray500)
-                                : (isSelected ? Colors.white : AppTheme.textSecondary),
+                                ? (isSelected ? AppTheme.success : AppTheme.gray400)
+                                : (isSelected ? AppTheme.primary500 : AppTheme.gray400),
+                            width: 2,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            letter,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: isSubmitted
+                                  ? (isSelected ? Colors.white : AppTheme.gray500)
+                                  : (isSelected ? Colors.white : AppTheme.textSecondary),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        optText,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                          color: isSubmitted
-                              ? (isSelected ? AppTheme.success : AppTheme.gray500)
-                              : (isSelected ? AppTheme.primary700 : AppTheme.textPrimary),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          optText,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                            color: isSubmitted
+                                ? (isSelected ? AppTheme.success : AppTheme.gray500)
+                                : (isSelected ? AppTheme.primary700 : AppTheme.textPrimary),
+                          ),
                         ),
                       ),
-                    ),
-                    if (isSelected)
-                      Icon(
-                        Icons.check_circle,
-                        color: isSubmitted ? AppTheme.success : AppTheme.primary500,
-                        size: 24,
-                      ),
-                  ],
+                      if (isSelected)
+                        Icon(
+                          Icons.check_circle,
+                          color: isSubmitted ? AppTheme.success : AppTheme.primary500,
+                          size: 24,
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          }),
+              );
+            }),
           if (question['type'] == 'short_answer') ...[
             TextFormField(
               initialValue: _selectedAnswers[qIndex],
