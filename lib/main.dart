@@ -9,12 +9,12 @@ import 'screens/main_shell_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
 
-void main() {
-  // ── Server IP configuration ─────────────────────────────────────────────
-  // Set to your machine's local IP so physical devices on the same WiFi can reach it.
-  // Run: ip addr show | grep "192.168"  to find your IP.
-  ApiConfig.setHost('192.168.1.15');
-  // ──────────────────────────────────────────────────────────────────────────
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Load optional runtime config from assets/config.json.
+  // Falls back to the Android emulator default (10.0.2.2:5000) if the file is missing.
+  await ApiConfig.loadFromAssets();
 
   runApp(
     MultiProvider(

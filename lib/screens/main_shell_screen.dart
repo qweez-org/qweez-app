@@ -7,6 +7,7 @@ import 'tabs/classes_tab.dart';
 import 'tabs/join_class_tab.dart';
 import 'tabs/inbox_tab.dart';
 import 'tabs/profile_tab.dart';
+import 'live_quiz_waiting_screen.dart';
 
 class MainShellScreen extends StatefulWidget {
   const MainShellScreen({super.key});
@@ -53,10 +54,47 @@ class _MainShellScreenState extends State<MainShellScreen> {
         }
       });
     });
+
+    // Listen for live quiz start events and show a SnackBar banner
+    _liveQuizService.liveStartedNotifier.addListener(_onLiveQuizStarted);
+  }
+
+  void _onLiveQuizStarted() {
+    final data = _liveQuizService.liveStartedNotifier.value;
+    if (data == null || !mounted) return;
+
+    final pin = data['pin'] as String?;
+    final quizTitle = data['quizTitle'] as String? ?? 'Live Quiz';
+    final className = data['className'] as String? ?? '';
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '🎯 $quizTitle started${className.isNotEmpty ? ' in $className' : ''}!',
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        duration: const Duration(seconds: 15),
+        behavior: SnackBarBehavior.floating,
+        action: pin != null
+            ? SnackBarAction(
+                label: 'JOIN',
+                textColor: Colors.white,
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => LiveQuizWaitingScreen(initialPin: pin),
+                    ),
+                  );
+                },
+              )
+            : null,
+      ),
+    );
   }
 
   @override
   void dispose() {
+    _liveQuizService.liveStartedNotifier.removeListener(_onLiveQuizStarted);
     _liveQuizService.disconnect();
     super.dispose();
   }

@@ -1,0 +1,145 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import '../config/api_config.dart';
+import '../theme/app_theme.dart';
+
+class ResetPasswordScreen extends StatefulWidget {
+  final String token;
+  final String userId;
+
+  const ResetPasswordScreen({super.key, required this.token, required this.userId});
+
+  @override
+  State<ResetPasswordScreen> createState() => _ResetPasswordScreenState();
+}
+
+class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
+  bool _loading = false;
+  String? _error;
+  bool _done = false;
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    setState(() { _error = null; _loading = true; });
+    final password = _passwordController.text;
+    final confirm = _confirmController.text;
+
+    if (password.length < 6) {
+      setState(() { _error = 'Password must be at least 6 characters.'; _loading = false; });
+      return;
+    }
+    if (password != confirm) {
+      setState(() { _error = 'Passwords do not match.'; _loading = false; });
+      return;
+    }
+
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/auth/reset-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'token': widget.token,
+          'userId': widget.userId,
+          'password': password,
+        }),
+      );
+      if (res.statusCode == 200) {
+        setState(() { _done = true; });
+      } else {
+        final body = jsonDecode(res.body);
+        setState(() { _error = body['message'] ?? 'Failed to reset password.'; });
+      }
+    } catch (e) {
+      setState(() { _error = 'Network error. Please try again.'; });
+    } finally {
+      setState(() { _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Reset Password')),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: _done
+            ? Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.green, size: 56),
+                    const SizedBox(height: 16),
+                    const Text('Password updated!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'You can now log in with your new password.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Back to Login'),
+                    ),
+                  ],
+                ),
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Create a new password for your account.',
+                    style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
+                  ),
+                  const SizedBox(height: 20),
+                  if (_error != null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
+                      child: Text(_error!, style: TextStyle(color: Colors.red.shade700, fontSize: 13)),
+                    ),
+                  TextField(
+                    controller: _passwordController,
+                    decoration: InputDecoration(
+                      labelText: 'New Password',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      ),
+                    ),
+                    obscureText: _obscurePassword,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _confirmController,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm Password',
+                      prefixIcon: Icon(Icons.lock_outline),
+                    ),
+                    obscureText: true,
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: _loading ? null : _submit,
+                    child: _loading
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Text('Update Password'),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}

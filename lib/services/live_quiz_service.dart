@@ -8,6 +8,11 @@ import '../models/class_model.dart';
 /// and listens for live quiz events across all joined classes.
 class LiveQuizService {
   io.Socket? _socket;
+
+  /// Notifier that fires when a live quiz starts. UI layers observe this.
+  final ValueNotifier<Map<String, dynamic>?> liveStartedNotifier =
+      ValueNotifier<Map<String, dynamic>?>(null);
+
   /// Initialize the socket connection and start listening for live quiz events.
   Future<void> connect(BuildContext context) async {
 
@@ -27,8 +32,14 @@ class LiveQuizService {
 
     _socket!.connect();
 
-
-
+    // Listen for live quiz start events from joined class rooms
+    _socket!.on('live:started', (data) {
+      if (data is Map<String, dynamic>) {
+        liveStartedNotifier.value = data;
+      } else if (data is Map) {
+        liveStartedNotifier.value = Map<String, dynamic>.from(data);
+      }
+    });
 
   }
 
