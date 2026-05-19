@@ -148,9 +148,14 @@ class _QuizScreenState extends State<QuizScreen> {
               MaterialPageRoute(builder: (_) => LiveLeaderboardScreen(quiz: widget.quiz, result: result)),
             );
           } else {
+            final canViewAnswerKey = result['canViewAnswerKey'] == true;
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => QuizResultScreen(result: result, quiz: widget.quiz)),
+              MaterialPageRoute(builder: (_) => QuizResultScreen(
+                result: result,
+                quiz: widget.quiz,
+                canViewAnswerKey: canViewAnswerKey,
+              )),
             );
           }
         } else {

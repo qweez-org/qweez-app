@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import '../models/class_model.dart';
 import '../theme/app_theme.dart';
+import 'answer_key_screen.dart';
 
 class QuizResultScreen extends StatelessWidget {
   final Map<String, dynamic> result;
   final QuizModel quiz;
   final num? previousBestScore;
+  final bool canViewAnswerKey;
 
   const QuizResultScreen({
     super.key,
     required this.result,
     required this.quiz,
     this.previousBestScore,
+    this.canViewAnswerKey = false,
   });
 
   @override
@@ -96,6 +99,34 @@ class QuizResultScreen extends StatelessWidget {
                 ],
               ],
               const SizedBox(height: 48),
+              if (canViewAnswerKey) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      final attemptId = attempt['_id'] ?? '';
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => AnswerKeyScreen(
+                            quizId: quiz.id,
+                            quizTitle: quiz.title,
+                            attemptId: attemptId,
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.fact_check_outlined),
+                    label: const Text('Lihat Kunci Jawaban'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      side: const BorderSide(color: AppTheme.primary400),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(

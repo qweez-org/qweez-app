@@ -113,7 +113,10 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
   bool get _canViewAnswerKey {
     if (!_showAnswerKey) return false;
     if (_attemptCount == 0) return false;
-    if (_attemptCount < _attemptLimit) return false;
+    // Allow if all attempts used OR quiz is closed/finished
+    final allAttemptsUsed = _attemptCount >= _attemptLimit;
+    final quizExpired = _quiz.status == 'closed' || _quiz.status == 'finished';
+    if (!allAttemptsUsed && !quizExpired) return false;
     final submitted = _lastAttemptResult != null;
     return submitted;
   }

@@ -142,7 +142,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
       }
     });
 
-    _socket!.on('quiz_started', (data) {
+    _socket!.on('quiz_started', (data) async {
 
       if (mounted) {
         final allQuestions = (data['allQuestions'] as List?)
@@ -172,7 +172,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
 
         // Navigate to the live quiz screen with all questions and total timer
         _isNavigatingToQuiz = true;
-        Navigator.pushReplacement(
+        await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => LiveQuizScreen(
@@ -186,6 +186,9 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
             ),
           ),
         );
+        // After LiveQuizScreen pops (student clicks "Selesai"), pop this waiting screen too
+        // so QuizDetailScreen's await resolves and refreshes data
+        if (mounted) Navigator.pop(context);
       }
     });
 
