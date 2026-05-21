@@ -13,6 +13,8 @@ class LiveQuizService {
   final ValueNotifier<Map<String, dynamic>?> liveStartedNotifier =
       ValueNotifier<Map<String, dynamic>?>(null);
 
+  final Set<String> _joinedClassIds = {};
+
   /// Initialize the socket connection and start listening for live quiz events.
   Future<void> connect(BuildContext context) async {
 
@@ -30,6 +32,13 @@ class LiveQuizService {
           .build(),
     );
 
+    _socket!.onConnect((_) {
+      // Re-join any previously joined class rooms
+      for (final classId in _joinedClassIds) {
+        _socket!.emit('join:class', classId);
+      }
+    });
+
     _socket!.connect();
 
     // Listen for live quiz start events from joined class rooms
@@ -45,6 +54,7 @@ class LiveQuizService {
 
   /// Join class rooms so the student receives live quiz notifications
   void joinClassRoom(String classId) {
+    _joinedClassIds.add(classId);
     if (_socket != null && _socket!.connected) {
       _socket!.emit('join:class', classId);
 
@@ -65,5 +75,6 @@ class LiveQuizService {
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
+    _joinedClassIds.clear();
   }
 }
