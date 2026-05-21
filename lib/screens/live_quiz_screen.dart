@@ -1,12 +1,10 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../theme/app_theme.dart';
+import '../providers/live_quiz_controller.dart';
 
-/// Live quiz screen showing questions one-by-one (same format as normal quiz).
-/// Student navigates with Next/Previous. On each Next click the answer is
-/// sent to the server so the teacher sees a real-time leaderboard update.
 class LiveQuizScreen extends StatefulWidget {
   final io.Socket socket;
   final String pin;
@@ -32,97 +30,22 @@ class LiveQuizScreen extends StatefulWidget {
 }
 
 class _LiveQuizScreenState extends State<LiveQuizScreen> {
+  late LiveQuizController _controller;
   final PageController _pageController = PageController();
-  int _currentIndex = 0;
-
-  // Map<questionIndex, selectedAnswer>
-  final Map<int, String> _selectedAnswers = {};
-  // Track which questions have been submitted to the server
-  final Set<int> _submittedQuestions = {};
-
-  // Timer
-  Timer? _timer;
-  int _secondsRemaining = 0;
-
-  // Track when each question was first shown, for accurate timeMs
-  final Map<int, DateTime> _questionStartTimes = {};
-
-  // Quiz state
-  bool _finished = false;
-  bool _quizEnded = false;
-  List<Map<String, dynamic>> _leaderboard = [];
 
   @override
   void initState() {
     super.initState();
-    _secondsRemaining = widget.totalDurationSec;
-    _questionStartTimes[0] = DateTime.now();
+    _controller = LiveQuizController(
+      socket: widget.socket,
+      pin: widget.pin,
+      allQuestions: widget.allQuestions,
+      totalDurationSec: widget.totalDurationSec,
+      existingAnswers: widget.existingAnswers,
+    );
 
-    if (widget.existingAnswers != null) {
-      widget.existingAnswers!.forEach((qIdxStr, ansData) {
-        final qIdx = int.tryParse(qIdxStr);
-        if (qIdx != null) {
-          _selectedAnswers[qIdx] = ansData['answer']?.toString() ?? '';
-          _submittedQuestions.add(qIdx);
-        }
-      });
-      
-      if (_submittedQuestions.isNotEmpty) {
-        for (int i = 0; i < widget.allQuestions.length; i++) {
-          if (!_submittedQuestions.contains(i)) {
-            _currentIndex = i;
-            break;
-          }
-        }
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted && _pageController.hasClients) {
-            _pageController.jumpToPage(_currentIndex);
-          }
-        });
-      }
-    }
-
-    _startTimer();
-    _setupSocketListeners();
-  }
-
-  void _startTimer() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      setState(() => _secondsRemaining--);
-      if (_secondsRemaining <= 0) {
-        timer.cancel();
-        _autoFinish();
-      }
-    });
-  }
-
-  void _setupSocketListeners() {
-    widget.socket.on('answer_received', (data) {
-
-    });
-
-    widget.socket.on('quiz_ended', (data) {
-
+    _controller.onSessionCancelled = () {
       if (mounted) {
-        final lb = (data['leaderboard'] as List?)
-                ?.map((e) => Map<String, dynamic>.from(e as Map))
-                .toList() ??
-            [];
-        setState(() {
-          _quizEnded = true;
-          _leaderboard = lb;
-        });
-        _timer?.cancel();
-      }
-    });
-
-    widget.socket.on('session_cancelled', (_) {
-      if (mounted) {
-        _timer?.cancel();
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -141,9 +64,9 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
           ),
         );
       }
-    });
+    };
 
-    widget.socket.on('teacher_disconnected', (_) {
+    _controller.onTeacherDisconnected = () {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -152,35 +75,26 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
           ),
         );
       }
+    };
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_controller.currentIndex > 0 && _pageController.hasClients) {
+        _pageController.jumpToPage(_controller.currentIndex);
+      }
     });
   }
 
-  void _selectAnswer(int questionIndex, String answer) {
-    if (_submittedQuestions.contains(questionIndex)) return;
-    setState(() => _selectedAnswers[questionIndex] = answer);
-  }
-
-  void _submitAnswerToServer(int currentIndex) {
-    final originalIndex = widget.allQuestions[currentIndex]['_originalIndex'] ?? currentIndex;
-    final selected = _selectedAnswers[currentIndex] ?? '';
-    final startTime = _questionStartTimes[currentIndex];
-    final timeMs = startTime != null
-        ? DateTime.now().difference(startTime).inMilliseconds
-        : 0;
-    widget.socket.emit('submit_answer', {
-      'pin': widget.pin,
-      'questionIndex': originalIndex,
-      'answer': selected,
-      'timeMs': timeMs,
-    });
-    _submittedQuestions.add(currentIndex);
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _controller.dispose();
+    super.dispose();
   }
 
   void _nextPage() {
     final totalQuestions = widget.allQuestions.length;
-    if (_currentIndex < totalQuestions - 1) {
-      // Send current answer to server before moving forward
-      _submitAnswerToServer(_currentIndex);
+    if (_controller.currentIndex < totalQuestions - 1) {
+      _controller.submitAnswerToServer(_controller.currentIndex);
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
@@ -189,46 +103,12 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
   }
 
   void _previousPage() {
-    if (_currentIndex > 0) {
+    if (_controller.currentIndex > 0) {
       _pageController.previousPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
     }
-  }
-
-  void _submitQuiz() {
-    // Send last question's answer
-    _submitAnswerToServer(_currentIndex);
-    _finishQuiz();
-  }
-
-  void _finishQuiz() {
-    if (_finished) return;
-    _finished = true;
-    _timer?.cancel();
-    setState(() {});
-
-    // Signal to server that this student is done
-    widget.socket.emit('submit_all_answers', {
-      'pin': widget.pin,
-      'answers': widget.allQuestions.asMap().entries.map((entry) {
-        final idx = entry.key;
-        final startTime = _questionStartTimes[idx];
-        final timeMs = startTime != null
-            ? DateTime.now().difference(startTime).inMilliseconds
-            : 0;
-        return {
-          'questionIndex': widget.allQuestions[idx]['_originalIndex'] ?? idx,
-          'answer': _selectedAnswers[idx] ?? '',
-          'timeMs': timeMs,
-        };
-      }).toList(),
-    });
-  }
-
-  void _autoFinish() {
-    _finishQuiz();
   }
 
   String _formatTime(int seconds) {
@@ -238,33 +118,30 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
   }
 
   @override
-  void dispose() {
-    _timer?.cancel();
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_quizEnded) return _buildLeaderboard();
-    if (_finished) return _buildWaitingView();
-    return _buildQuizView();
+    return ChangeNotifierProvider.value(
+      value: _controller,
+      child: Consumer<LiveQuizController>(
+        builder: (context, controller, child) {
+          if (controller.quizEnded) return _buildLeaderboard(controller);
+          if (controller.finished) return _buildWaitingView(controller);
+          return _buildQuizView(controller);
+        },
+      ),
+    );
   }
 
-  // ── Quiz View (one-by-one with PageView) ──────────────────────────────────
-
-  Widget _buildQuizView() {
+  Widget _buildQuizView(LiveQuizController controller) {
     final totalQuestions = widget.allQuestions.length;
-    final isLastQuestion = _currentIndex == totalQuestions - 1;
-    final hasSelected = _selectedAnswers.containsKey(_currentIndex);
-    final isSubmitted = _submittedQuestions.contains(_currentIndex);
+    final isLastQuestion = controller.currentIndex == totalQuestions - 1;
+    final hasSelected = controller.selectedAnswers.containsKey(controller.currentIndex);
+    final isSubmitted = controller.submittedQuestions.contains(controller.currentIndex);
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
           children: [
-            // Top bar: progress + timer
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               decoration: BoxDecoration(
@@ -275,7 +152,7 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Soal ${_currentIndex + 1} dari $totalQuestions',
+                    'Soal ${controller.currentIndex + 1} dari $totalQuestions',
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       color: AppTheme.textSecondary,
@@ -284,7 +161,7 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: _secondsRemaining < 60
+                      color: controller.secondsRemaining < 60
                           ? AppTheme.error.withValues(alpha: 0.08)
                           : AppTheme.primary50,
                       borderRadius: BorderRadius.circular(20),
@@ -294,14 +171,14 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
                         Icon(
                           Icons.timer_outlined,
                           size: 16,
-                          color: _secondsRemaining < 60 ? AppTheme.error : AppTheme.primary600,
+                          color: controller.secondsRemaining < 60 ? AppTheme.error : AppTheme.primary600,
                         ),
                         const SizedBox(width: 6),
                         Text(
-                          _formatTime(_secondsRemaining),
+                          _formatTime(controller.secondsRemaining),
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: _secondsRemaining < 60 ? AppTheme.error : AppTheme.primary600,
+                            color: controller.secondsRemaining < 60 ? AppTheme.error : AppTheme.primary600,
                           ),
                         ),
                       ],
@@ -310,46 +187,32 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
                 ],
               ),
             ),
-
-            // Linear progress
             LinearProgressIndicator(
-              value: (_currentIndex + 1) / totalQuestions,
+              value: (controller.currentIndex + 1) / totalQuestions,
               backgroundColor: AppTheme.gray200,
               valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary400),
             ),
-
-            // Timer progress bar
             LinearProgressIndicator(
-              value: _secondsRemaining / widget.totalDurationSec,
+              value: controller.secondsRemaining / widget.totalDurationSec,
               backgroundColor: AppTheme.primary100,
               valueColor: AlwaysStoppedAnimation<Color>(
-                _secondsRemaining <= 60 ? AppTheme.error : AppTheme.primary500,
+                controller.secondsRemaining <= 60 ? AppTheme.error : AppTheme.primary500,
               ),
               minHeight: 3,
             ),
-
-            // Questions PageView
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
                 physics: const NeverScrollableScrollPhysics(),
                 onPageChanged: (idx) {
-                  setState(() {
-                    _currentIndex = idx;
-                  });
-                  // Record start time for this question only the first time it is shown
-                  if (!_questionStartTimes.containsKey(idx)) {
-                    _questionStartTimes[idx] = DateTime.now();
-                  }
+                  controller.setCurrentIndex(idx);
                 },
                 itemCount: totalQuestions,
                 itemBuilder: (context, index) {
-                  return _buildQuestionCard(widget.allQuestions[index], index);
+                  return _buildQuestionCard(controller, widget.allQuestions[index], index);
                 },
               ),
             ),
-
-            // Footer Navigation
             Container(
               padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
@@ -364,7 +227,7 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
               ),
               child: Row(
                 children: [
-                  if (_currentIndex > 0 && widget.allowBacktrack)
+                  if (controller.currentIndex > 0 && widget.allowBacktrack)
                     Expanded(
                       child: OutlinedButton(
                         onPressed: _previousPage,
@@ -378,13 +241,11 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
                     )
                   else
                     const Spacer(),
-
                   const SizedBox(width: 16),
-
                   Expanded(
                     child: ElevatedButton(
                       onPressed: isLastQuestion
-                          ? (hasSelected || isSubmitted ? _submitQuiz : null)
+                          ? (hasSelected || isSubmitted ? controller.submitQuiz : null)
                           : (hasSelected || isSubmitted ? _nextPage : null),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isLastQuestion ? AppTheme.textPrimary : AppTheme.primary400,
@@ -405,8 +266,8 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
     );
   }
 
-  Widget _buildQuestionCard(Map<String, dynamic> question, int qIndex) {
-    final isSubmitted = _submittedQuestions.contains(qIndex);
+  Widget _buildQuestionCard(LiveQuizController controller, Map<String, dynamic> question, int qIndex) {
+    final isSubmitted = controller.submittedQuestions.contains(qIndex);
     final options = (question['options'] as List?)
             ?.map((o) => Map<String, dynamic>.from(o as Map))
             .toList() ??
@@ -474,11 +335,11 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
               final optIdx = optEntry.key;
               final option = optEntry.value;
               final optText = option['text'] ?? '';
-              final isSelected = _selectedAnswers[qIndex] == optText;
+              final isSelected = controller.selectedAnswers[qIndex] == optText;
               final letter = String.fromCharCode(65 + optIdx);
 
               return GestureDetector(
-                onTap: isSubmitted ? null : () => _selectAnswer(qIndex, optText),
+                onTap: isSubmitted ? null : () => controller.selectAnswer(qIndex, optText),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   margin: const EdgeInsets.only(bottom: 12),
@@ -551,7 +412,7 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
             }),
           if (question['type'] == 'short_answer') ...[
             TextFormField(
-              initialValue: _selectedAnswers[qIndex],
+              initialValue: controller.selectedAnswers[qIndex],
               maxLines: 1,
               enabled: !isSubmitted,
               decoration: InputDecoration(
@@ -561,7 +422,7 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
                 fillColor: isSubmitted ? AppTheme.gray100 : Colors.white,
               ),
               onChanged: (val) {
-                _selectAnswer(qIndex, val);
+                controller.selectAnswer(qIndex, val);
               },
             ),
           ],
@@ -570,9 +431,7 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
     );
   }
 
-  // ── Waiting View (after submit) ────────────────────────────────────────────
-
-  Widget _buildWaitingView() {
+  Widget _buildWaitingView(LiveQuizController controller) {
     return Scaffold(
       backgroundColor: AppTheme.primary50,
       body: SafeArea(
@@ -612,7 +471,7 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
               ),
               const SizedBox(height: 24),
               Text(
-                'Sisa waktu: ${_formatTime(_secondsRemaining)}',
+                'Sisa waktu: ${_formatTime(controller.secondsRemaining)}',
                 style: const TextStyle(
                   fontSize: 14,
                   color: AppTheme.textTertiary,
@@ -626,9 +485,7 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
     );
   }
 
-  // ── Leaderboard ────────────────────────────────────────────────────────────
-
-  Widget _buildLeaderboard() {
+  Widget _buildLeaderboard(LiveQuizController controller) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('🏆 Hasil Live Quiz'),
@@ -661,13 +518,13 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
               ),
             ),
             Expanded(
-              child: _leaderboard.isEmpty
+              child: controller.leaderboard.isEmpty
                   ? const Center(child: Text('Belum ada data'))
                   : ListView.builder(
                       padding: const EdgeInsets.all(16),
-                      itemCount: _leaderboard.length,
+                      itemCount: controller.leaderboard.length,
                       itemBuilder: (context, index) {
-                        final entry = _leaderboard[index];
+                        final entry = controller.leaderboard[index];
                         final rank = entry['rank'] ?? (index + 1);
                         final name = entry['displayName'] ?? 'Siswa';
                         final score = entry['score'] ?? 0;

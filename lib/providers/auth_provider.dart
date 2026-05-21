@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
 import '../config/api_config.dart';
+import '../services/api_service.dart';
 import '../services/token_service.dart';
 
 class AuthProvider with ChangeNotifier {
@@ -23,40 +24,6 @@ class AuthProvider with ChangeNotifier {
 
   String get _baseUrl => ApiConfig.baseUrl;
 
-  Future<bool> _refreshAccessToken() async {
-    final rt = _refreshToken ?? await TokenService.getRefreshToken();
-    if (rt == null) return false;
-
-    try {
-      final response = await http.post(
-        Uri.parse('${_baseUrl}/auth/refresh'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'refreshToken': rt}),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final newAccess = data['accessToken'] as String?;
-        final newRefresh = data['refreshToken'] as String?;
-        if (newAccess == null) return false;
-
-        _accessToken = newAccess;
-        if (newRefresh != null) {
-          _refreshToken = newRefresh;
-          await TokenService.setTokens(accessToken: newAccess, refreshToken: newRefresh);
-        } else {
-          await TokenService.setAccessToken(newAccess);
-        }
-
-        return true;
-      }
-    } catch (e) {
-      debugPrint('REFRESH ERROR: $e');
-    }
-
-    return false;
-  }
-
   Future<void> loadUser() async {
     _isInitializing = true;
     _authError = null;
@@ -67,10 +34,7 @@ class AuthProvider with ChangeNotifier {
 
       if (_accessToken != null) {
         try {
-          final response = await http.get(
-            Uri.parse('${_baseUrl}/auth/me'),
-            headers: {'Authorization': 'Bearer $_accessToken'},
-          ).timeout(const Duration(seconds: 10));
+          final response = await ApiService.get('/auth/me');
           if (response.statusCode == 200) {
             _user = User.fromJson(json.decode(response.body)['user']);
             if (_user?.role != 'student') {
@@ -78,32 +42,6 @@ class AuthProvider with ChangeNotifier {
               _refreshToken = null;
               _user = null;
               _authError = 'This app is for students only. Please use a student account.';
-              await TokenService.clearTokens();
-            }
-          } else if (response.statusCode == 401 && _refreshToken != null) {
-            final ok = await _refreshAccessToken();
-            if (ok) {
-              final retry = await http.get(
-                Uri.parse('${_baseUrl}/auth/me'),
-                headers: {'Authorization': 'Bearer $_accessToken'},
-              ).timeout(const Duration(seconds: 10));
-              if (retry.statusCode == 200) {
-                _user = User.fromJson(json.decode(retry.body)['user']);
-                if (_user?.role != 'student') {
-                  _accessToken = null;
-                  _refreshToken = null;
-                  _user = null;
-                  _authError = 'This app is for students only. Please use a student account.';
-                  await TokenService.clearTokens();
-                }
-              } else {
-                _accessToken = null;
-                _refreshToken = null;
-                await TokenService.clearTokens();
-              }
-            } else {
-              _accessToken = null;
-              _refreshToken = null;
               await TokenService.clearTokens();
             }
           } else {
@@ -135,7 +73,7 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final response = await http.post(
-        Uri.parse('${_baseUrl}/auth/login'),
+        Uri.parse('$_baseUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'email': email, 'password': password, 'role': 'student'}),
       ).timeout(const Duration(seconds: 10));
@@ -187,7 +125,7 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final response = await http.post(
-        Uri.parse('${_baseUrl}/auth/register'),
+        Uri.parse('$_baseUrl/auth/register'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'name': name,
@@ -235,16 +173,8 @@ class AuthProvider with ChangeNotifier {
   Future<void> logout() async {
     try {
       final rt = _refreshToken ?? await TokenService.getRefreshToken();
-      final at = _accessToken ?? await TokenService.getAccessToken();
-      if (at != null) {
-        await http.post(
-          Uri.parse('${_baseUrl}/auth/logout'),
-          headers: {
-            'Authorization': 'Bearer $at',
-            'Content-Type': 'application/json',
-          },
-          body: json.encode({'refreshToken': rt}),
-        ).timeout(const Duration(seconds: 10));
+      if (rt != null) {
+        await ApiService.post('/auth/logout', body: {'refreshToken': rt});
       }
     } catch (_) {
       // ignore

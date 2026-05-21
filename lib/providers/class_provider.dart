@@ -1,11 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../models/class_model.dart';
+import '../services/api_service.dart';
 import '../config/api_config.dart';
-import '../services/token_service.dart';
 
 class ClassProvider with ChangeNotifier {
   List<ClassModel> _classes = [];
@@ -15,8 +13,6 @@ class ClassProvider with ChangeNotifier {
   List<ClassModel> get classes => _classes;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-
-  String get _baseUrl => ApiConfig.baseUrl;
 
   /// Fix #24: Clear error state
   void clearError() {
@@ -30,18 +26,7 @@ class ClassProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await TokenService.getAccessToken();
-      if (token == null) {
-        _errorMessage = 'Not authenticated';
-        _isLoading = false;
-        notifyListeners();
-        return;
-      }
-
-      final response = await http.get(
-        Uri.parse('${_baseUrl}/classes'),
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(const Duration(seconds: 15));
+      final response = await ApiService.get('/classes');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -64,13 +49,7 @@ class ClassProvider with ChangeNotifier {
 
   Future<List<TopicModel>> fetchTopics(String classId) async {
     try {
-      final token = await TokenService.getAccessToken();
-      if (token == null) return [];
-
-      final response = await http.get(
-        Uri.parse('${_baseUrl}/classes/topics/$classId'),
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(const Duration(seconds: 15));
+      final response = await ApiService.get('/classes/topics/$classId');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -91,13 +70,7 @@ class ClassProvider with ChangeNotifier {
 
   Future<List<QuizModel>> fetchQuizzesForTopic(String topicId) async {
     try {
-      final token = await TokenService.getAccessToken();
-      if (token == null) return [];
-
-      final response = await http.get(
-        Uri.parse('${_baseUrl}/quizzes/topics/$topicId'),
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(const Duration(seconds: 15));
+      final response = await ApiService.get('/quizzes/topics/$topicId');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -118,17 +91,7 @@ class ClassProvider with ChangeNotifier {
 
   Future<bool> joinClass(String code) async {
     try {
-      final token = await TokenService.getAccessToken();
-      if (token == null) return false;
-
-      final response = await http.post(
-        Uri.parse('${_baseUrl}/classes/join-requests'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({'code': code}),
-      ).timeout(const Duration(seconds: 15));
+      final response = await ApiService.post('/classes/join-requests', body: {'code': code});
 
       if (response.statusCode == 201) {
         return true;
@@ -151,16 +114,7 @@ class ClassProvider with ChangeNotifier {
 
   Future<bool> leaveClass(String classId) async {
     try {
-      final token = await TokenService.getAccessToken();
-      if (token == null) return false;
-
-      final response = await http.post(
-        Uri.parse('${_baseUrl}/classes/$classId/leave'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 15));
+      final response = await ApiService.post('/classes/$classId/leave');
 
       if (response.statusCode == 200) {
         _classes.removeWhere((c) => c.id == classId);

@@ -1,17 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../models/class_model.dart';
 import '../models/question_model.dart';
 import '../config/api_config.dart';
-import '../services/token_service.dart';
+import '../services/api_service.dart';
 
 class QuizProvider with ChangeNotifier {
-  String get _baseUrl => ApiConfig.baseUrl;
-
   AttemptModel? _currentAttempt;
   List<QuestionModel> _questions = [];
   Map<String, String> _answers = {}; // questionId -> answer
@@ -34,14 +30,8 @@ class QuizProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await TokenService.getAccessToken();
-      if (token == null) throw Exception('Not authenticated');
-
       // 1. Start or resume attempt
-      final startRes = await http.post(
-        Uri.parse('${_baseUrl}/attempts/quizzes/${quiz.id}/start'),
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(const Duration(seconds: 15));
+      final startRes = await ApiService.post('/attempts/quizzes/${quiz.id}/start');
 
       if (startRes.statusCode != 200 && startRes.statusCode != 201) {
         final errorMsg = json.decode(startRes.body)['message'] ?? 'Failed to start quiz';
@@ -52,10 +42,7 @@ class QuizProvider with ChangeNotifier {
       _currentAttempt = AttemptModel.fromJson(startData['attempt']);
 
       // 2. Fetch existing answers if resuming
-      final attemptRes = await http.get(
-        Uri.parse('${_baseUrl}/attempts/${_currentAttempt!.id}'),
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(const Duration(seconds: 15));
+      final attemptRes = await ApiService.get('/attempts/${_currentAttempt!.id}');
 
       if (attemptRes.statusCode == 200) {
         final attemptData = json.decode(attemptRes.body);
@@ -66,10 +53,7 @@ class QuizProvider with ChangeNotifier {
       }
 
       // 3. Fetch questions
-      final questionsRes = await http.get(
-        Uri.parse('${_baseUrl}/quizzes/${quiz.id}/questions'),
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(const Duration(seconds: 15));
+      final questionsRes = await ApiService.get('/quizzes/${quiz.id}/questions');
 
       if (questionsRes.statusCode == 200) {
         final questionsData = json.decode(questionsRes.body);
@@ -138,21 +122,13 @@ class QuizProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await TokenService.getAccessToken();
-      if (token == null || _currentAttempt == null) return;
+      if (_currentAttempt == null) return;
 
-      await http.put(
-        Uri.parse('${_baseUrl}/attempts/${_currentAttempt!.id}/answers'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'answers': [
-            {'questionId': questionId, 'answer': answer}
-          ]
-        }),
-      ).timeout(const Duration(seconds: 10));
+      await ApiService.put('/attempts/${_currentAttempt!.id}/answers', body: {
+        'answers': [
+          {'questionId': questionId, 'answer': answer}
+        ]
+      });
     } catch (e) {
       // Save locally even if network fails — answer is already in _answers map
 
@@ -165,13 +141,9 @@ class QuizProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final token = await TokenService.getAccessToken();
-      if (token == null || _currentAttempt == null) throw Exception('Not authenticated');
+      if (_currentAttempt == null) throw Exception('No current attempt');
 
-      final res = await http.post(
-        Uri.parse('${_baseUrl}/attempts/${_currentAttempt!.id}/submit'),
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(const Duration(seconds: 15));
+      final res = await ApiService.post('/attempts/${_currentAttempt!.id}/submit');
 
       _isLoading = false;
       notifyListeners();
