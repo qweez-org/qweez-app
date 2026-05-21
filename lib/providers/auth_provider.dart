@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/user.dart';
@@ -20,7 +21,7 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get authError => _authError;
 
-  final String baseUrl = ApiConfig.baseUrl;
+  String get _baseUrl => ApiConfig.baseUrl;
 
   Future<bool> _refreshAccessToken() async {
     final rt = _refreshToken ?? await TokenService.getRefreshToken();
@@ -28,7 +29,7 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/auth/refresh'),
+        Uri.parse('${_baseUrl}/auth/refresh'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'refreshToken': rt}),
       ).timeout(const Duration(seconds: 10));
@@ -67,7 +68,7 @@ class AuthProvider with ChangeNotifier {
       if (_accessToken != null) {
         try {
           final response = await http.get(
-            Uri.parse('$baseUrl/auth/me'),
+            Uri.parse('${_baseUrl}/auth/me'),
             headers: {'Authorization': 'Bearer $_accessToken'},
           ).timeout(const Duration(seconds: 10));
           if (response.statusCode == 200) {
@@ -83,7 +84,7 @@ class AuthProvider with ChangeNotifier {
             final ok = await _refreshAccessToken();
             if (ok) {
               final retry = await http.get(
-                Uri.parse('$baseUrl/auth/me'),
+                Uri.parse('${_baseUrl}/auth/me'),
                 headers: {'Authorization': 'Bearer $_accessToken'},
               ).timeout(const Duration(seconds: 10));
               if (retry.statusCode == 200) {
@@ -134,7 +135,7 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/auth/login'),
+        Uri.parse('${_baseUrl}/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'email': email, 'password': password, 'role': 'student'}),
       ).timeout(const Duration(seconds: 10));
@@ -164,6 +165,12 @@ class AuthProvider with ChangeNotifier {
         notifyListeners();
         return true;
       }
+    } on SocketException catch (e) {
+      debugPrint('LOGIN NETWORK ERROR: $e');
+      _isLoading = false;
+      _authError = 'Cannot connect to server. Check your network and make sure the API is running.';
+      notifyListeners();
+      return false;
     } catch (e) {
       debugPrint('LOGIN ERROR: $e');
     }
@@ -180,7 +187,7 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/auth/register'),
+        Uri.parse('${_baseUrl}/auth/register'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'name': name,
@@ -212,11 +219,16 @@ class AuthProvider with ChangeNotifier {
         notifyListeners();
         return 'Registration failed. Please try again.';
       }
+    } on SocketException catch (e) {
+      debugPrint('REGISTER NETWORK ERROR: $e');
+      _isLoading = false;
+      notifyListeners();
+      return 'Cannot connect to server. Check your network and make sure the API is running.';
     } catch (e) {
       debugPrint('REGISTER ERROR: $e');
       _isLoading = false;
       notifyListeners();
-      return 'Network error. Check your connection.';
+      return 'Registration failed. Please try again.';
     }
   }
 
@@ -226,7 +238,7 @@ class AuthProvider with ChangeNotifier {
       final at = _accessToken ?? await TokenService.getAccessToken();
       if (at != null) {
         await http.post(
-          Uri.parse('$baseUrl/auth/logout'),
+          Uri.parse('${_baseUrl}/auth/logout'),
           headers: {
             'Authorization': 'Bearer $at',
             'Content-Type': 'application/json',

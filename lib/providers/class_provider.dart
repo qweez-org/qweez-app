@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/class_model.dart';
@@ -14,7 +16,7 @@ class ClassProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  final String baseUrl = ApiConfig.baseUrl;
+  String get _baseUrl => ApiConfig.baseUrl;
 
   /// Fix #24: Clear error state
   void clearError() {
@@ -37,7 +39,7 @@ class ClassProvider with ChangeNotifier {
       }
 
       final response = await http.get(
-        Uri.parse('$baseUrl/classes'),
+        Uri.parse('${_baseUrl}/classes'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 15));
 
@@ -48,8 +50,12 @@ class ClassProvider with ChangeNotifier {
       } else {
         _errorMessage = 'Failed to load classes (${response.statusCode})';
       }
+    } on SocketException catch (e) {
+      debugPrint('CLASS FETCH NETWORK ERROR: $e');
+      _errorMessage = 'Cannot connect to server (${ApiConfig.baseUrl}). Make sure the API is running and you are on the same WiFi.';
     } catch (e) {
-      _errorMessage = 'Network error. Check your connection.';
+      debugPrint('CLASS FETCH ERROR: $e');
+      _errorMessage = 'Failed to load classes. Please try again.';
     }
 
     _isLoading = false;
@@ -62,7 +68,7 @@ class ClassProvider with ChangeNotifier {
       if (token == null) return [];
 
       final response = await http.get(
-        Uri.parse('$baseUrl/classes/topics/$classId'),
+        Uri.parse('${_baseUrl}/classes/topics/$classId'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 15));
 
@@ -71,8 +77,13 @@ class ClassProvider with ChangeNotifier {
         final List<dynamic> topicsList = data['topics'] ?? [];
         return topicsList.map((t) => TopicModel.fromJson(t)).toList();
       }
+    } on SocketException catch (e) {
+      debugPrint('TOPICS FETCH NETWORK ERROR: $e');
+      _errorMessage = 'Cannot connect to server. Make sure the API is running.';
+      notifyListeners();
     } catch (e) {
-      _errorMessage = 'Failed to load topics. Check your connection.';
+      debugPrint('TOPICS FETCH ERROR: $e');
+      _errorMessage = 'Failed to load topics. Please try again.';
       notifyListeners();
     }
     return [];
@@ -84,7 +95,7 @@ class ClassProvider with ChangeNotifier {
       if (token == null) return [];
 
       final response = await http.get(
-        Uri.parse('$baseUrl/quizzes/topics/$topicId'),
+        Uri.parse('${_baseUrl}/quizzes/topics/$topicId'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 15));
 
@@ -93,8 +104,13 @@ class ClassProvider with ChangeNotifier {
         final List<dynamic> quizList = data['quizzes'] ?? [];
         return quizList.map((q) => QuizModel.fromJson(q)).toList();
       }
+    } on SocketException catch (e) {
+      debugPrint('QUIZZES FETCH NETWORK ERROR: $e');
+      _errorMessage = 'Cannot connect to server. Make sure the API is running.';
+      notifyListeners();
     } catch (e) {
-      _errorMessage = 'Failed to load quizzes. Check your connection.';
+      debugPrint('QUIZZES FETCH ERROR: $e');
+      _errorMessage = 'Failed to load quizzes. Please try again.';
       notifyListeners();
     }
     return [];
@@ -106,7 +122,7 @@ class ClassProvider with ChangeNotifier {
       if (token == null) return false;
 
       final response = await http.post(
-        Uri.parse('$baseUrl/classes/join-requests'),
+        Uri.parse('${_baseUrl}/classes/join-requests'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -121,8 +137,13 @@ class ClassProvider with ChangeNotifier {
         _errorMessage = data['message'] ?? 'Failed to join class';
         notifyListeners();
       }
+    } on SocketException catch (e) {
+      debugPrint('JOIN CLASS NETWORK ERROR: $e');
+      _errorMessage = 'Cannot connect to server. Make sure the API is running.';
+      notifyListeners();
     } catch (e) {
-      _errorMessage = 'Network error. Check your connection.';
+      debugPrint('JOIN CLASS ERROR: $e');
+      _errorMessage = 'Failed to join class. Please try again.';
       notifyListeners();
     }
     return false;
@@ -134,7 +155,7 @@ class ClassProvider with ChangeNotifier {
       if (token == null) return false;
 
       final response = await http.post(
-        Uri.parse('$baseUrl/classes/$classId/leave'),
+        Uri.parse('${_baseUrl}/classes/$classId/leave'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -149,8 +170,13 @@ class ClassProvider with ChangeNotifier {
         _errorMessage = 'Failed to leave class';
         notifyListeners();
       }
+    } on SocketException catch (e) {
+      debugPrint('LEAVE CLASS NETWORK ERROR: $e');
+      _errorMessage = 'Cannot connect to server. Make sure the API is running.';
+      notifyListeners();
     } catch (e) {
-      _errorMessage = 'Network error. Check your connection.';
+      debugPrint('LEAVE CLASS ERROR: $e');
+      _errorMessage = 'Failed to leave class. Please try again.';
       notifyListeners();
     }
     return false;

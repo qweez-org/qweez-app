@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/class_model.dart';
@@ -8,7 +10,7 @@ import '../config/api_config.dart';
 import '../services/token_service.dart';
 
 class QuizProvider with ChangeNotifier {
-  final String baseUrl = ApiConfig.baseUrl;
+  String get _baseUrl => ApiConfig.baseUrl;
 
   AttemptModel? _currentAttempt;
   List<QuestionModel> _questions = [];
@@ -37,7 +39,7 @@ class QuizProvider with ChangeNotifier {
 
       // 1. Start or resume attempt
       final startRes = await http.post(
-        Uri.parse('$baseUrl/attempts/quizzes/${quiz.id}/start'),
+        Uri.parse('${_baseUrl}/attempts/quizzes/${quiz.id}/start'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 15));
 
@@ -51,7 +53,7 @@ class QuizProvider with ChangeNotifier {
 
       // 2. Fetch existing answers if resuming
       final attemptRes = await http.get(
-        Uri.parse('$baseUrl/attempts/${_currentAttempt!.id}'),
+        Uri.parse('${_baseUrl}/attempts/${_currentAttempt!.id}'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 15));
 
@@ -65,7 +67,7 @@ class QuizProvider with ChangeNotifier {
 
       // 3. Fetch questions
       final questionsRes = await http.get(
-        Uri.parse('$baseUrl/quizzes/${quiz.id}/questions'),
+        Uri.parse('${_baseUrl}/quizzes/${quiz.id}/questions'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 15));
 
@@ -92,6 +94,12 @@ class QuizProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
       return true;
+    } on SocketException catch (e) {
+      debugPrint('START QUIZ NETWORK ERROR: $e');
+      _errorMessage = 'Cannot connect to server. Make sure the API is running and you are on the same WiFi.';
+      _isLoading = false;
+      notifyListeners();
+      return false;
     } catch (e) {
       _errorMessage = e.toString().replaceFirst('Exception: ', '');
       _isLoading = false;
@@ -134,7 +142,7 @@ class QuizProvider with ChangeNotifier {
       if (token == null || _currentAttempt == null) return;
 
       await http.put(
-        Uri.parse('$baseUrl/attempts/${_currentAttempt!.id}/answers'),
+        Uri.parse('${_baseUrl}/attempts/${_currentAttempt!.id}/answers'),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -161,7 +169,7 @@ class QuizProvider with ChangeNotifier {
       if (token == null || _currentAttempt == null) throw Exception('Not authenticated');
 
       final res = await http.post(
-        Uri.parse('$baseUrl/attempts/${_currentAttempt!.id}/submit'),
+        Uri.parse('${_baseUrl}/attempts/${_currentAttempt!.id}/submit'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(const Duration(seconds: 15));
 
@@ -177,8 +185,15 @@ class QuizProvider with ChangeNotifier {
         notifyListeners();
         return null;
       }
+    } on SocketException catch (e) {
+      debugPrint('SUBMIT QUIZ NETWORK ERROR: $e');
+      _errorMessage = 'Cannot connect to server. Make sure the API is running.';
+      _isLoading = false;
+      notifyListeners();
+      return null;
     } catch (e) {
-      _errorMessage = 'Network error while submitting';
+      debugPrint('SUBMIT QUIZ ERROR: $e');
+      _errorMessage = 'Failed to submit quiz. Please try again.';
       _isLoading = false;
       notifyListeners();
       return null;
