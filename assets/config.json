@@ -1,4 +1,6 @@
 {
-  "apiHost": "",
-  "apiPort": 5000
+  "_comment": "Set apiHost to your dev machine IP (ip addr show). Leave empty to use Android emulator default (10.0.2.2).",
+  "apiHost": "192.168.1.15",
+  "apiPort": 5000,
+  "apiUrl": ""
 }

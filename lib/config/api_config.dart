@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class ApiConfig {
@@ -28,11 +29,15 @@ class ApiConfig {
       final port = config['apiPort'] as int?;
       if (host != null && host.isNotEmpty) {
         setHost(host, port: port ?? 5000);
+        debugPrint('[ApiConfig] Loaded from assets: host=$host port=$port → $baseUrl');
       } else if (config['apiUrl'] != null && (config['apiUrl'] as String).isNotEmpty) {
         setBaseUrl(config['apiUrl'] as String);
+        debugPrint('[ApiConfig] Loaded from assets: apiUrl=$baseUrl');
+      } else {
+        debugPrint('[ApiConfig] assets/config.json has empty apiHost/apiUrl — using default: $baseUrl');
       }
-    } catch (_) {
-      // Config file missing or invalid — keep default
+    } catch (e) {
+      debugPrint('[ApiConfig] Failed to load assets/config.json — using default: $baseUrl ($e)');
     }
   }
 }
