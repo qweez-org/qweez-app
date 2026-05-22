@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../theme/app_theme.dart';
@@ -88,6 +89,12 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
   void dispose() {
     _pageController.dispose();
     _controller.dispose();
+    // Clear stored pin only if quiz actually ended
+    if (_controller.quizEnded) {
+      SharedPreferences.getInstance().then((prefs) {
+        prefs.remove('live_quiz_active_pin');
+      });
+    }
     super.dispose();
   }
 

@@ -3,6 +3,8 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../config/api_config.dart';
 import '../services/token_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../theme/app_theme.dart';
 import 'live_quiz_screen.dart';
 
@@ -36,8 +38,19 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
     super.initState();
     if (widget.initialPin != null && widget.initialPin!.isNotEmpty) {
       _pinController.text = widget.initialPin!;
-      // Auto-join if PIN provided
       WidgetsBinding.instance.addPostFrameCallback((_) => _joinSession());
+    } else {
+      // Check for stored active session
+      _checkStoredSession();
+    }
+  }
+
+  Future<void> _checkStoredSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final storedPin = prefs.getString('live_quiz_active_pin');
+    if (storedPin != null && storedPin.isNotEmpty && mounted) {
+      _pinController.text = storedPin;
+      _joinSession();
     }
   }
 
@@ -101,13 +114,16 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
     // ── Socket Event Handlers ──────────────────────────────────────────────
 
     _socket!.on('join_success', (data) {
-
       if (mounted) {
         setState(() {
           _isInLobby = true;
           _isConnecting = false;
           _quizTitle = data['quizTitle'] ?? 'Live Quiz';
           _participantCount = data['participantCount'] ?? 1;
+        });
+        // Store active pin
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('live_quiz_active_pin', _pinController.text.trim());
         });
       }
     });
@@ -189,6 +205,10 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
         // After LiveQuizScreen pops (student clicks "Selesai"), pop this waiting screen too
         // so QuizDetailScreen's await resolves and refreshes data
         if (mounted) Navigator.pop(context);
+        // Clear stored pin after quiz navigation completes
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.remove('live_quiz_active_pin');
+        });
       }
     });
 
@@ -197,6 +217,9 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
         _socket?.disconnect();
         _socket?.dispose();
         _socket = null;
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.remove('live_quiz_active_pin');
+        });
         showDialog(
           context: context,
           barrierDismissible: false,

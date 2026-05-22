@@ -81,8 +81,11 @@ class TopicCard extends StatefulWidget {
 class _TopicCardState extends State<TopicCard> {
   List<QuizModel> _quizzes = [];
   bool _isLoadingQuizzes = false;
+  bool _isExpanded = false;
+  bool _hasLoaded = false;
 
   Future<void> _loadQuizzes() async {
+    if (_hasLoaded) return;
     setState(() => _isLoadingQuizzes = true);
     final provider = Provider.of<ClassProvider>(context, listen: false);
     final allQuizzes = await provider.fetchQuizzesForTopic(widget.topic.id);
@@ -90,7 +93,15 @@ class _TopicCardState extends State<TopicCard> {
       setState(() {
         _quizzes = allQuizzes.where((q) => q.status != 'draft').toList();
         _isLoadingQuizzes = false;
+        _hasLoaded = true;
       });
+    }
+  }
+
+  void _toggle() {
+    setState(() => _isExpanded = !_isExpanded);
+    if (_isExpanded && !_hasLoaded) {
+      _loadQuizzes();
     }
   }
 
@@ -98,78 +109,128 @@ class _TopicCardState extends State<TopicCard> {
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
-      child: ExpansionTile(
-        title: Text(
-          widget.topic.name,
-          style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
-        ),
-        subtitle: widget.topic.description.isNotEmpty
-            ? Text(widget.topic.description, maxLines: 1, overflow: TextOverflow.ellipsis)
-            : null,
-        onExpansionChanged: (expanded) {
-          if (expanded) _loadQuizzes();
-        },
+      clipBehavior: Clip.antiAlias,
+      child: Column(
         children: [
-          if (_isLoadingQuizzes)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (_quizzes.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Text('No quizzes available in this topic.', style: TextStyle(color: AppTheme.textSecondary)),
-            )
-          else
-            ..._quizzes.map((quiz) {
-              final statusColor = quizStatusColor(quiz.status);
-              return ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: quiz.mode == 'live' ? AppTheme.warning.withValues(alpha: 0.1) : AppTheme.primary50,
-                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                  ),
-                  child: Icon(
-                    quiz.mode == 'live' ? Icons.bolt : Icons.assignment,
-                    color: quiz.mode == 'live' ? AppTheme.live : AppTheme.primary600,
-                  ),
-                ),
-                title: Row(
-                  children: [
-                    Expanded(child: Text(quiz.title)),
-                    if (quiz.isCompleted == true)
-                      const Icon(Icons.check_circle, color: AppTheme.success, size: 20),
-                  ],
-                ),
-                subtitle: Row(
-                  children: [
-                    Text('${quiz.duration} mins • '),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        quizStatusLabel(quiz.status),
-                        style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600),
-                      ),
+          // Tappable header row
+          InkWell(
+            onTap: _toggle,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary50,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusSm),
                     ),
-                  ],
-                ),
-                trailing: Icon(quizTrailingIcon(quiz.status), color: AppTheme.textTertiary, size: 18),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => QuizDetailScreen(quiz: quiz)),
-                  );
-                },
-              );
-            }),
-          const SizedBox(height: 8),
+                    child: const Icon(Icons.folder_outlined, color: AppTheme.primary600, size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.topic.name,
+                          style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                        ),
+                        if (widget.topic.description.isNotEmpty)
+                          Text(
+                            widget.topic.description,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                          ),
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: _isExpanded ? 0.25 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(Icons.chevron_right, color: AppTheme.textTertiary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Animated quiz list
+          AnimatedSize(
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeInOut,
+            alignment: Alignment.topCenter,
+            child: _isExpanded ? _buildQuizList() : const SizedBox.shrink(),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildQuizList() {
+    if (_isLoadingQuizzes) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_quizzes.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(16.0),
+        child: Text('No quizzes available in this topic.', style: TextStyle(color: AppTheme.textSecondary)),
+      );
+    }
+    return Column(
+      children: [
+        const Divider(height: 1),
+        ..._quizzes.map((quiz) {
+          final statusColor = quizStatusColor(quiz.status);
+          return ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: quiz.mode == 'live' ? AppTheme.warning.withValues(alpha: 0.1) : AppTheme.primary50,
+                borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+              ),
+              child: Icon(
+                quiz.mode == 'live' ? Icons.bolt : Icons.assignment,
+                color: quiz.mode == 'live' ? AppTheme.live : AppTheme.primary600,
+              ),
+            ),
+            title: Row(
+              children: [
+                Expanded(child: Text(quiz.title)),
+                if (quiz.isCompleted == true)
+                  const Icon(Icons.check_circle, color: AppTheme.success, size: 20),
+              ],
+            ),
+            subtitle: Row(
+              children: [
+                Text('${quiz.duration} mins • '),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    quizStatusLabel(quiz.status),
+                    style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            trailing: Icon(quizTrailingIcon(quiz.status), color: AppTheme.textTertiary, size: 18),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => QuizDetailScreen(quiz: quiz)),
+              );
+            },
+          );
+        }),
+        const SizedBox(height: 8),
+      ],
     );
   }
 }

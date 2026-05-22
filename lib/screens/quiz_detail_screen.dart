@@ -30,6 +30,8 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
   Map<String, dynamic>? _lastAttemptResult;
   Map<String, dynamic>? _bestAttemptResult;
   bool _showAnswerKey = false;
+  bool _hasInProgressAttempt = false;
+  List<dynamic> _submittedAttempts = [];
 
   @override
   void initState() {
@@ -39,7 +41,11 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
   }
 
   Future<void> _loadQuizInfo() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _hasInProgressAttempt = false;
+      _submittedAttempts = [];
+    });
 
     try {
       final token = await TokenService.getAccessToken();
@@ -70,21 +76,58 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
         final List<dynamic> attempts = data['attempts'] ?? [];
         _attemptCount = attempts.length;
 
+        // Check for in-progress attempts
+        dynamic inProgress;
+        for (final a in attempts) {
+          if (a['status'] == 'in_progress') {
+            inProgress = a;
+            break;
+          }
+        }
+        _hasInProgressAttempt = inProgress != null;
+
         // Find last submitted attempt for showing result
         final submitted = attempts.where((a) => a['status'] == 'submitted').toList();
+
+        // Sort submitted attempts chronologically (ascending) to assign attempt numbers
+        submitted.sort((a, b) {
+          final aTime = DateTime.parse(a['submittedAt'] ?? a['createdAt'] ?? '');
+          final bTime = DateTime.parse(b['submittedAt'] ?? b['createdAt'] ?? '');
+          return aTime.compareTo(bTime);
+        });
+
+        // Store them with their original attempt number, but in descending order (newest first)
+        final numbered = [];
+        for (int i = 0; i < submitted.length; i++) {
+          numbered.add({
+            'number': i + 1,
+            'attempt': submitted[i],
+          });
+        }
+        numbered.sort((a, b) {
+          final aTime = DateTime.parse(a['attempt']['submittedAt'] ?? a['attempt']['createdAt'] ?? '');
+          final bTime = DateTime.parse(b['attempt']['submittedAt'] ?? b['attempt']['createdAt'] ?? '');
+          return bTime.compareTo(aTime);
+        });
+        _submittedAttempts = numbered;
+
         if (submitted.isNotEmpty) {
-          _lastAttemptResult = submitted.first;
+          _lastAttemptResult = submitted.last;
 
           // Find best attempt (highest score)
           Map<String, dynamic>? best;
+          num bestScore = -1;
           for (final a in submitted) {
             final score = (a['score'] ?? a['earnedPoints'] ?? 0) as num;
-            final bestScore = (best?['score'] ?? best?['earnedPoints'] ?? -1) as num;
-            if (best == null || score > bestScore) {
+            if (score > bestScore) {
+              bestScore = score;
               best = a;
             }
           }
           _bestAttemptResult = best;
+        } else {
+          _lastAttemptResult = null;
+          _bestAttemptResult = null;
         }
       }
     } catch (e) {
@@ -106,6 +149,9 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
       return _isLiveSessionOpen;
     }
     // Regular quizzes
+    if (_hasInProgressAttempt) {
+      return _quiz.status == 'open' || _quiz.status == 'in_progress';
+    }
     if (_quiz.status != 'open') return false;
     if (_attemptCount >= _attemptLimit) return false;
     return true;
@@ -151,10 +197,13 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(24),
-              children: [
-                // Quiz Title
+          : RefreshIndicator(
+              onRefresh: _loadQuizInfo,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(24),
+                children: [
+                  // Quiz Title
                 Text(
                   _quiz.title,
                   style: Theme.of(context).textTheme.headlineMedium,
@@ -273,6 +322,79 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
                   const SizedBox(height: 24),
                 ],
 
+                // Attempt History (Multi-Attempt List)
+                if (_attemptLimit > 1 && _submittedAttempts.isNotEmpty) ...[
+                  Text(
+                    'Riwayat Percobaan',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const SizedBox(height: 12),
+                  ..._submittedAttempts.map((item) {
+                    final attemptNumber = item['number'];
+                    final a = item['attempt'];
+                    final earned = a['earnedPoints'] ?? a['score'] ?? 0;
+                    final total = a['totalPoints'] ?? 0;
+                    final pct = total > 0 ? ((earned / total) * 100).round() : 0;
+                    final subTime = a['submittedAt'] != null ? DateTime.parse(a['submittedAt']) : null;
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Attempt #$attemptNumber',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _formatDate(subTime),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textTertiary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Row(
+                              children: [
+                                Text(
+                                  '$earned / $total pts',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                ScoreBadge(
+                                  text: '$pct%',
+                                  isHigh: pct >= 60,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 24),
+                ],
+
                 // Answer Key Button
                 if (_canViewAnswerKey) ...[                  SizedBox(
                     width: double.infinity,
@@ -312,34 +434,42 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
                                 context,
                                 MaterialPageRoute(builder: (_) => const LiveQuizWaitingScreen()),
                               );
+                              if (mounted) await _loadQuizInfo();
                             } else {
                               await Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => QuizScreen(quiz: _quiz)),
+                                MaterialPageRoute(builder: (_) => QuizScreen(
+                                  quiz: _quiz,
+                                  previousBestScore: _bestAttemptResult != null
+                                      ? (_bestAttemptResult!['earnedPoints'] ?? _bestAttemptResult!['score'] ?? 0) as num
+                                      : null,
+                                )),
                               );
+                              if (mounted) await _loadQuizInfo();
                             }
-                            // Refresh info after returning
-                            _loadQuizInfo();
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     child: Text(
-                      _attemptCount >= _attemptLimit
-                          ? 'Attempt Limit Reached'
-                          : _quiz.status == 'scheduled'
-                              ? 'Quiz Not Yet Open'
-                              : (_quiz.status == 'closed' || _quiz.status == 'finished')
-                                  ? (_quiz.mode == 'live' ? 'Sesi Selesai' : 'Quiz Closed')
-                                  : _quiz.mode == 'live'
-                                      ? (_isLiveSessionOpen ? 'Join Live Quiz' : 'Menunggu Sesi Dimulai')
-                                      : 'Start Quiz',
+                      _hasInProgressAttempt
+                          ? 'Lanjutkan Kuis'
+                          : (_attemptCount >= _attemptLimit
+                              ? 'Attempt Limit Reached'
+                              : _quiz.status == 'scheduled'
+                                  ? 'Quiz Not Yet Open'
+                                  : (_quiz.status == 'closed' || _quiz.status == 'finished')
+                                      ? (_quiz.mode == 'live' ? 'Sesi Selesai' : 'Quiz Closed')
+                                      : _quiz.mode == 'live'
+                                          ? (_isLiveSessionOpen ? 'Join Live Quiz' : 'Menunggu Sesi Dimulai')
+                                          : 'Start Quiz'),
                     ),
                   ),
                 ),
               ],
             ),
+          ),
     );
   }
 

@@ -12,8 +12,9 @@ import '../services/token_service.dart';
 
 class QuizScreen extends StatefulWidget {
   final QuizModel quiz;
+  final num? previousBestScore;
 
-  const QuizScreen({super.key, required this.quiz});
+  const QuizScreen({super.key, required this.quiz, this.previousBestScore});
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -80,12 +81,25 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Future<void> _startQuiz() async {
-    final success = await Provider.of<QuizProvider>(context, listen: false).startQuiz(widget.quiz);
+    // Reset page position before loading
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
+    setState(() => _currentIndex = 0);
+
+    final provider = Provider.of<QuizProvider>(context, listen: false);
+    final success = await provider.startQuiz(widget.quiz);
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(Provider.of<QuizProvider>(context, listen: false).errorMessage ?? 'Failed to start quiz')),
+        SnackBar(content: Text(provider.errorMessage ?? 'Failed to start quiz')),
       );
       Navigator.pop(context);
+      return;
+    }
+    // Jump to first unanswered question if resuming
+    if (mounted && provider.resumeIndex > 0 && _pageController.hasClients) {
+      _pageController.jumpToPage(provider.resumeIndex);
+      setState(() => _currentIndex = provider.resumeIndex);
     }
   }
 
@@ -154,6 +168,7 @@ class _QuizScreenState extends State<QuizScreen> {
               MaterialPageRoute(builder: (_) => QuizResultScreen(
                 result: result,
                 quiz: widget.quiz,
+                previousBestScore: widget.previousBestScore,
                 canViewAnswerKey: canViewAnswerKey,
               )),
             );

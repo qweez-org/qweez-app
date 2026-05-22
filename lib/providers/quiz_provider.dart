@@ -16,6 +16,7 @@ class QuizProvider with ChangeNotifier {
 
   Timer? _timer;
   int _remainingSeconds = 0;
+  int _resumeIndex = 0;
 
   AttemptModel? get currentAttempt => _currentAttempt;
   List<QuestionModel> get questions => _questions;
@@ -23,11 +24,18 @@ class QuizProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   int get remainingSeconds => _remainingSeconds;
+  int get resumeIndex => _resumeIndex;
 
   Future<bool> startQuiz(QuizModel quiz) async {
-    _isLoading = true;
+    // Reset immediately before any async work so no stale data is rendered
+    _questions = [];
+    _answers = {};
+    _currentAttempt = null;
+    _remainingSeconds = 0;
     _errorMessage = null;
-    notifyListeners();
+    _isLoading = true;
+    _resumeIndex = 0;
+    notifyListeners();   // triggers rebuild with empty state
 
     try {
       // 1. Start or resume attempt
@@ -40,6 +48,7 @@ class QuizProvider with ChangeNotifier {
 
       final startData = json.decode(startRes.body);
       _currentAttempt = AttemptModel.fromJson(startData['attempt']);
+      final isResuming = startData['message'] == 'Resuming existing attempt';
 
       // 2. Fetch existing answers if resuming
       final attemptRes = await ApiService.get('/attempts/${_currentAttempt!.id}');
@@ -51,6 +60,9 @@ class QuizProvider with ChangeNotifier {
           for (var a in existingAnswers) a['questionId']: a['answer']
         };
       }
+
+      // Determine resume index if resuming
+      _resumeIndex = 0;
 
       // 3. Fetch questions
       final questionsRes = await ApiService.get('/quizzes/${quiz.id}/questions');
@@ -70,6 +82,14 @@ class QuizProvider with ChangeNotifier {
         }
       } else {
         throw Exception('Failed to load questions');
+      }
+
+      // If resuming, find first unanswered question
+      if (isResuming) {
+        final firstUnanswered = _questions.indexWhere((q) => !_answers.containsKey(q.id));
+        _resumeIndex = firstUnanswered >= 0 ? firstUnanswered : _questions.length - 1;
+      } else {
+        _resumeIndex = 0;
       }
 
       // Setup Timer
