@@ -192,13 +192,23 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
               backgroundColor: AppTheme.gray200,
               valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary400),
             ),
-            LinearProgressIndicator(
-              value: controller.secondsRemaining / widget.totalDurationSec,
-              backgroundColor: AppTheme.primary100,
-              valueColor: AlwaysStoppedAnimation<Color>(
-                controller.secondsRemaining <= 60 ? AppTheme.error : AppTheme.primary500,
+            TweenAnimationBuilder<double>(
+              duration: const Duration(seconds: 1),
+              curve: Curves.linear,
+              tween: Tween<double>(
+                begin: controller.secondsRemaining / widget.totalDurationSec,
+                end: controller.secondsRemaining / widget.totalDurationSec,
               ),
-              minHeight: 3,
+              builder: (context, value, _) {
+                return LinearProgressIndicator(
+                  value: value,
+                  backgroundColor: AppTheme.primary100,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    controller.secondsRemaining <= 60 ? AppTheme.error : AppTheme.primary500,
+                  ),
+                  minHeight: 3,
+                );
+              },
             ),
             Expanded(
               child: PageView.builder(
@@ -575,7 +585,7 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
                     ),
             ),
             Padding(
-              padding: EdgeInsets.all(16).copyWith(bottom: 16 + MediaQuery.of(context).padding.bottom),
+              padding: const EdgeInsets.all(16),
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(

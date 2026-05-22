@@ -5,6 +5,8 @@ import '../../providers/class_provider.dart';
 import '../../theme/app_theme.dart';
 import '../in_class_shell_screen.dart';
 import '../live_quiz_waiting_screen.dart';
+import '../../widgets/shimmer_card.dart';
+import '../../widgets/empty_state.dart';
 
 class ClassesTab extends StatefulWidget {
   const ClassesTab({super.key});
@@ -34,7 +36,14 @@ class _ClassesTabState extends State<ClassesTab> {
         automaticallyImplyLeading: false,
       ),
       body: classProvider.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? ListView.builder(
+              padding: const EdgeInsets.all(24.0),
+              itemCount: 3,
+              itemBuilder: (context, index) => const Padding(
+                padding: EdgeInsets.only(bottom: 16),
+                child: ShimmerCard(height: 120),
+              ),
+            )
           : RefreshIndicator(
               onRefresh: () => classProvider.fetchClasses(),
               child: ListView(
@@ -109,21 +118,9 @@ class _ClassesTabState extends State<ClassesTab> {
                   ),
                   const SizedBox(height: 24),
                   if (classProvider.classes.isEmpty)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32.0),
-                        child: Column(
-                          children: [
-                            Icon(Icons.class_outlined, size: 64, color: AppTheme.primary200),
-                            const SizedBox(height: 16),
-                            const Text(
-                              'You are not enrolled in any classes yet.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: AppTheme.textSecondary),
-                            ),
-                          ],
-                        ),
-                      ),
+                    const EmptyState(
+                      icon: Icons.class_outlined,
+                      title: 'You are not enrolled in any classes yet.',
                     )
                   else
                     ...classProvider.classes.map((c) {

@@ -6,6 +6,8 @@ import '../../theme/app_theme.dart';
 import '../../utils/quiz_helpers.dart';
 import '../../../config/api_config.dart';
 import '../../services/token_service.dart';
+import '../../widgets/shimmer_card.dart';
+import '../../widgets/empty_state.dart';
 
 class RiwayatTab extends StatefulWidget {
   final ClassModel classData;
@@ -65,7 +67,16 @@ class _RiwayatTabState extends State<RiwayatTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(24),
+        itemCount: 4,
+        itemBuilder: (context, index) => const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: ShimmerCard(height: 80),
+        ),
+      );
+    }
     if (_errorMessage != null) {
       return Center(
         child: Padding(
@@ -81,12 +92,9 @@ class _RiwayatTabState extends State<RiwayatTab> {
       );
     }
     if (_attempts.isEmpty) {
-      return Center(
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Icons.history, size: 64, color: AppTheme.primary200),
-          const SizedBox(height: 16),
-          const Text('No quiz attempts yet.', style: TextStyle(color: AppTheme.textSecondary)),
-        ]),
+      return const EmptyState(
+        icon: Icons.history,
+        title: 'No quiz attempts yet.',
       );
     }
     return RefreshIndicator(

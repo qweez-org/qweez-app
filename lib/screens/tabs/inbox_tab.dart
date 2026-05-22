@@ -4,6 +4,8 @@ import 'package:http/http.dart' as http;
 import '../../theme/app_theme.dart';
 import '../../config/api_config.dart';
 import '../../services/token_service.dart';
+import '../../widgets/shimmer_card.dart';
+import '../../widgets/empty_state.dart';
 
 class InboxTab extends StatefulWidget {
   const InboxTab({super.key});
@@ -115,7 +117,14 @@ class _InboxTabState extends State<InboxTab> {
         automaticallyImplyLeading: false,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? ListView.builder(
+              padding: const EdgeInsets.all(16.0),
+              itemCount: 5,
+              itemBuilder: (context, index) => const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: ShimmerCard(height: 80),
+              ),
+            )
           : _errorMessage != null
               ? Center(
                   child: Padding(
@@ -130,15 +139,10 @@ class _InboxTabState extends State<InboxTab> {
                   ),
                 )
               : _notifications.isEmpty
-              ? Center(
-                  child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                    Icon(Icons.notifications_none, size: 80, color: AppTheme.primary200),
-                    const SizedBox(height: 24),
-                    Text('No Notifications Yet', style: Theme.of(context).textTheme.headlineMedium),
-                    const SizedBox(height: 8),
-                    const Text('When you have new quizzes, announcements, or class approvals, they will appear here.',
-                        textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textSecondary)),
-                  ]),
+              ? const EmptyState(
+                  icon: Icons.notifications_none,
+                  title: 'No Notifications Yet',
+                  message: 'When you have new quizzes, announcements, or class approvals, they will appear here.',
                 )
               : RefreshIndicator(
                   onRefresh: _loadNotifications,

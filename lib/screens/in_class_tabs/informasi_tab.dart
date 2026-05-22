@@ -5,6 +5,7 @@ import '../../models/class_model.dart';
 import '../../theme/app_theme.dart';
 import '../../../config/api_config.dart';
 import '../../services/token_service.dart';
+import '../../widgets/shimmer_card.dart';
 
 class InformasiTab extends StatefulWidget {
   final ClassModel classData;
@@ -128,7 +129,14 @@ class _InformasiTabState extends State<InformasiTab> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return ListView.builder(
+        padding: const EdgeInsets.all(24),
+        itemCount: 4,
+        itemBuilder: (context, index) => const Padding(
+          padding: EdgeInsets.only(bottom: 12),
+          child: ShimmerCard(height: 70),
+        ),
+      );
     }
 
     if (_errorMessage != null) {

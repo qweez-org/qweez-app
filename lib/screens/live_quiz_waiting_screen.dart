@@ -254,7 +254,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).padding.bottom),
+            padding: const EdgeInsets.all(24),
             child: _isInLobby ? _buildLobby() : _buildPinEntry(),
           ),
         ),
@@ -419,9 +419,22 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
             children: [
               const Icon(Icons.group, color: AppTheme.primary600, size: 28),
               const SizedBox(width: 12),
-              Text(
-                '$_participantCount siswa bergabung',
-                style: const TextStyle(
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) => ScaleTransition(scale: animation, child: child),
+                child: Text(
+                  '$_participantCount',
+                  key: ValueKey<int>(_participantCount),
+                  style: const TextStyle(
+                    color: AppTheme.primary700,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
+              ),
+              const Text(
+                ' siswa bergabung',
+                style: TextStyle(
                   color: AppTheme.primary700,
                   fontWeight: FontWeight.bold,
                   fontSize: 18,

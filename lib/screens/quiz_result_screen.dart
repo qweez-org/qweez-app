@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/class_model.dart';
 import '../theme/app_theme.dart';
+import '../widgets/score_badge.dart';
 import 'answer_key_screen.dart';
 
 class QuizResultScreen extends StatelessWidget {
@@ -86,9 +87,23 @@ class QuizResultScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  '$earnedPoints / $totalPoints pts (${totalPoints > 0 ? ((earnedPoints / totalPoints) * 100).round() : 0}%)',
-                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.primary600),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '$earnedPoints / $totalPoints pts',
+                      style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.primary600),
+                    ),
+                    if (totalPoints > 0) ...[
+                      const SizedBox(width: 12),
+                      ScoreBadge(
+                        text: '${((earnedPoints / totalPoints) * 100).round()}%',
+                        isHigh: (earnedPoints / totalPoints) >= 0.8,
+                        isMid: (earnedPoints / totalPoints) >= 0.6 && (earnedPoints / totalPoints) < 0.8,
+                        isLow: (earnedPoints / totalPoints) < 0.6,
+                      ),
+                    ],
+                  ],
                 ),
                 if (isMultiAttempt && !isNewBest && previousBestScore != null) ...[
                   const SizedBox(height: 12),

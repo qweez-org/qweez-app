@@ -3,9 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../models/class_model.dart';
 import '../../theme/app_theme.dart';
-import '../../utils/quiz_helpers.dart';
+
 import '../../../config/api_config.dart';
 import '../../services/token_service.dart';
+import '../../widgets/shimmer_card.dart';
+import '../../widgets/empty_state.dart';
+import '../../widgets/score_badge.dart';
 
 class NilaiTab extends StatefulWidget {
   final ClassModel classData;
@@ -70,7 +73,13 @@ class _NilaiTabState extends State<NilaiTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) {
+      return ListView.builder(
+        padding: const EdgeInsets.all(24),
+        itemCount: 1,
+        itemBuilder: (context, index) => const ShimmerCard(height: 300),
+      );
+    }
     if (_errorMessage != null) {
       return Center(
         child: Padding(
@@ -86,12 +95,9 @@ class _NilaiTabState extends State<NilaiTab> {
       );
     }
     if (_quizGrades.isEmpty) {
-      return Center(
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Icons.leaderboard_outlined, size: 64, color: AppTheme.primary200),
-          const SizedBox(height: 16),
-          const Text('No grades available yet.', style: TextStyle(color: AppTheme.textSecondary)),
-        ]),
+      return const EmptyState(
+        icon: Icons.leaderboard_outlined,
+        title: 'No grades available yet.',
       );
     }
     return RefreshIndicator(
@@ -126,8 +132,17 @@ class _NilaiTabState extends State<NilaiTab> {
                   return TableRow(children: [
                     Padding(padding: const EdgeInsets.all(12), child: Text(g['title'], style: const TextStyle(fontSize: 13))),
                     Padding(padding: const EdgeInsets.all(12), child: Text(hasScore ? '$earned/$total' : '-', style: const TextStyle(fontSize: 13))),
-                    Padding(padding: const EdgeInsets.all(12), child: Text(pct != null ? '$pct%' : '-', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-                      color: pct == null ? AppTheme.textTertiary : scoreBandColor(pct.toDouble())))),
+                    Padding(padding: const EdgeInsets.all(12), child: pct != null 
+                      ? Align(
+                          alignment: Alignment.centerLeft,
+                          child: ScoreBadge(
+                            text: '$pct%',
+                            isHigh: pct >= 80,
+                            isMid: pct >= 60 && pct < 80,
+                            isLow: pct < 60,
+                          ),
+                        ) 
+                      : const Text('-', style: TextStyle(fontSize: 13, color: AppTheme.textTertiary))),
                   ]);
                 }),
               ],

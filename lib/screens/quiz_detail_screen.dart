@@ -8,6 +8,7 @@ import 'quiz_screen.dart';
 import 'live_quiz_waiting_screen.dart';
 import '../../config/api_config.dart';
 import '../services/token_service.dart';
+import '../widgets/score_badge.dart';
 import 'answer_key_screen.dart';
 
 class QuizDetailScreen extends StatefulWidget {
@@ -248,9 +249,19 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
                                   style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
                                 ),
                                 const SizedBox(height: 4),
-                                Text(
-                                  '${_bestAttemptResult!['earnedPoints'] ?? _bestAttemptResult!['score'] ?? '-'} / ${_bestAttemptResult!['totalPoints'] ?? '-'} pts (${_bestAttemptResult!['totalPoints'] != null && _bestAttemptResult!['totalPoints'] > 0 ? (((_bestAttemptResult!['earnedPoints'] ?? _bestAttemptResult!['score'] ?? 0) / _bestAttemptResult!['totalPoints']) * 100).round() : 0}%)',
-                                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primary700),
+                                Row(
+                                  children: [
+                                    Text(
+                                      '${_bestAttemptResult!['earnedPoints'] ?? _bestAttemptResult!['score'] ?? '-'} / ${_bestAttemptResult!['totalPoints'] ?? '-'} pts',
+                                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primary700),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    if (_bestAttemptResult!['totalPoints'] != null && _bestAttemptResult!['totalPoints'] > 0)
+                                      ScoreBadge(
+                                        text: '${(((_bestAttemptResult!['earnedPoints'] ?? _bestAttemptResult!['score'] ?? 0) / _bestAttemptResult!['totalPoints']) * 100).round()}%',
+                                        isHigh: true,
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),

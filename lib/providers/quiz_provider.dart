@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../models/class_model.dart';
 import '../models/question_model.dart';
-import '../config/api_config.dart';
+
 import '../services/api_service.dart';
 
 class QuizProvider with ChangeNotifier {

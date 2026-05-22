@@ -5,6 +5,8 @@ import '../../providers/class_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/quiz_helpers.dart';
 import '../quiz_detail_screen.dart';
+import '../../widgets/shimmer_card.dart';
+import '../../widgets/empty_state.dart';
 
 class KelasTab extends StatefulWidget {
   final ClassModel classData;
@@ -41,22 +43,20 @@ class _KelasTabState extends State<KelasTab> {
   @override
   Widget build(BuildContext context) {
     return _isLoading
-        ? const Center(child: CircularProgressIndicator())
+        ? ListView.builder(
+            padding: const EdgeInsets.all(24),
+            itemCount: 3,
+            itemBuilder: (context, index) => const Padding(
+              padding: EdgeInsets.only(bottom: 16),
+              child: ShimmerCard(height: 100),
+            ),
+          )
         : RefreshIndicator(
             onRefresh: _loadTopics,
             child: _topics.isEmpty
-                ? ListView(
-                    padding: const EdgeInsets.all(24),
-                    children: [
-                      const SizedBox(height: 64),
-                      Icon(Icons.folder_open, size: 64, color: AppTheme.primary200),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'No topics found for this class.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: AppTheme.textSecondary),
-                      ),
-                    ],
+                ? const EmptyState(
+                    icon: Icons.folder_open,
+                    title: 'No topics found for this class.',
                   )
                 : ListView.builder(
                     padding: const EdgeInsets.all(24.0),

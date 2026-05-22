@@ -5,7 +5,7 @@ import '../models/question_model.dart';
 import '../providers/quiz_provider.dart';
 import '../theme/app_theme.dart';
 import 'quiz_result_screen.dart';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../config/api_config.dart';
 import 'live_leaderboard_screen.dart';
 import '../services/token_service.dart';
@@ -22,7 +22,7 @@ class QuizScreen extends StatefulWidget {
 class _QuizScreenState extends State<QuizScreen> {
   final PageController _pageController = PageController();
   int _currentIndex = 0;
-  IO.Socket? _socket;
+  io.Socket? _socket;
 
   @override
   void initState() {
@@ -40,9 +40,9 @@ class _QuizScreenState extends State<QuizScreen> {
     if (token == null) return;
 
     final serverUrl = ApiConfig.baseUrl.replaceAll('/api', '');
-    _socket = IO.io(
+    _socket = io.io(
       serverUrl,
-      IO.OptionBuilder()
+      io.OptionBuilder()
           .setTransports(['websocket', 'polling'])
           .disableAutoConnect()
           .setAuth({'token': token})
@@ -266,6 +266,24 @@ class _QuizScreenState extends State<QuizScreen> {
                     backgroundColor: AppTheme.gray200,
                     valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary400),
                   ),
+                  TweenAnimationBuilder<double>(
+                    duration: const Duration(seconds: 1),
+                    curve: Curves.linear,
+                    tween: Tween<double>(
+                      begin: provider.remainingSeconds / (widget.quiz.duration * 60),
+                      end: provider.remainingSeconds / (widget.quiz.duration * 60),
+                    ),
+                    builder: (context, value, _) {
+                      return LinearProgressIndicator(
+                        value: value,
+                        backgroundColor: AppTheme.primary100,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          provider.remainingSeconds <= 60 ? AppTheme.error : AppTheme.primary500,
+                        ),
+                        minHeight: 3,
+                      );
+                    },
+                  ),
 
                   // Questions PageView
                   Expanded(
@@ -342,9 +360,12 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   Widget _buildQuestionCard(QuestionModel question, QuizProvider provider) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 800),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
@@ -423,7 +444,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   ),
                 ),
               );
-            }).toList()
+            })
           else if (question.type == 'short_answer')
             TextFormField(
               initialValue: provider.answers[question.id],
@@ -440,6 +461,8 @@ class _QuizScreenState extends State<QuizScreen> {
               },
             ),
         ],
+      ),
+        ),
       ),
     );
   }

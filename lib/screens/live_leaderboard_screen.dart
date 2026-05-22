@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../models/class_model.dart';
 import '../theme/app_theme.dart';
@@ -19,7 +19,7 @@ class LiveLeaderboardScreen extends StatefulWidget {
 }
 
 class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
-  late IO.Socket _socket;
+  late io.Socket _socket;
   bool _isLoading = true;
   String? _errorMessage;
   List<Map<String, dynamic>> _leaderboard = [];
@@ -73,9 +73,9 @@ class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
     if (token == null) return;
 
     final serverUrl = ApiConfig.baseUrl.replaceAll('/api', '');
-    _socket = IO.io(
+    _socket = io.io(
       serverUrl,
-      IO.OptionBuilder()
+      io.OptionBuilder()
           .setTransports(['websocket', 'polling'])
           .disableAutoConnect()
           .setAuth({'token': token})
@@ -143,9 +143,13 @@ class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
     final score = data['score']?.toString() ?? '0';
 
     Color rankColor;
-    if (rank == 1) rankColor = const Color(0xFFFACC15); // gold
-    else if (rank == 2) rankColor = AppTheme.gray300; // silver
-    else rankColor = const Color(0xFFCD7F32); // bronze
+    if (rank == 1) {
+      rankColor = const Color(0xFFFACC15); // gold
+    } else if (rank == 2) {
+      rankColor = AppTheme.gray300; // silver
+    } else {
+      rankColor = const Color(0xFFCD7F32); // bronze
+    }
 
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
