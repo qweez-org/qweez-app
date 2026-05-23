@@ -460,6 +460,57 @@ class _QuizScreenState extends State<QuizScreen> {
                 ),
               );
             })
+          else if (question.type == 'true_false' && question.options != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 16),
+              child: Row(
+                children: question.options!.map((option) {
+                  final isSelected = provider.answers[question.id] == option.text;
+                  final isBenar = option.text == 'Benar';
+                  
+                  return Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        left: isBenar ? 0 : 8,
+                        right: isBenar ? 8 : 0,
+                      ),
+                      child: isSelected
+                          ? ElevatedButton.icon(
+                              onPressed: () => provider.saveAnswer(question.id, option.text),
+                              icon: Icon(isBenar ? Icons.check : Icons.close, size: 20),
+                              label: Text(
+                                option.text,
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primary400,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 20),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            )
+                          : OutlinedButton.icon(
+                              onPressed: () => provider.saveAnswer(question.id, option.text),
+                              icon: Icon(isBenar ? Icons.check : Icons.close, size: 20, color: AppTheme.primary500),
+                              label: Text(
+                                option.text,
+                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primary500),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppTheme.primary400, width: 2),
+                                padding: const EdgeInsets.symmetric(vertical: 20),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            )
           else if (question.type == 'short_answer')
             TextFormField(
               initialValue: provider.answers[question.id],

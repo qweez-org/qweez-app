@@ -347,7 +347,64 @@ class _LiveQuizScreenState extends State<LiveQuizScreen> {
             ),
           ),
           const SizedBox(height: 24),
-          if (question['type'] != 'short_answer')
+          if (question['type'] == 'true_false') ...[
+            Row(
+              children: options.map((option) {
+                final optText = option['text'] ?? '';
+                final isSelected = controller.selectedAnswers[qIndex] == optText;
+                final isBenar = optText == 'Benar';
+
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: isBenar ? 0 : 8,
+                      right: isBenar ? 8 : 0,
+                    ),
+                    child: isSelected
+                        ? ElevatedButton.icon(
+                            onPressed: isSubmitted ? null : () => controller.selectAnswer(qIndex, optText),
+                            icon: Icon(isBenar ? Icons.check : Icons.close, size: 20),
+                            label: Text(
+                              optText,
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: isSubmitted ? AppTheme.success : AppTheme.primary400,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 20),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          )
+                        : OutlinedButton.icon(
+                            onPressed: isSubmitted ? null : () => controller.selectAnswer(qIndex, optText),
+                            icon: Icon(isBenar ? Icons.check : Icons.close, size: 20, color: isSubmitted ? AppTheme.gray400 : AppTheme.primary500),
+                            label: Text(
+                              optText,
+                              style: TextStyle(
+                                fontSize: 16, 
+                                fontWeight: FontWeight.bold, 
+                                color: isSubmitted ? AppTheme.gray400 : AppTheme.primary500,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(
+                                color: isSubmitted ? AppTheme.gray300 : AppTheme.primary400, 
+                                width: 2,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 20),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+          if (question['type'] == 'multiple_choice')
             ...options.asMap().entries.map((optEntry) {
               final optIdx = optEntry.key;
               final option = optEntry.value;
