@@ -148,12 +148,25 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
       if (_quiz.status == 'finished' || _quiz.status == 'closed') return false;
       return _isLiveSessionOpen;
     }
-    // Regular quizzes
+    
     if (_hasInProgressAttempt) {
-      return _quiz.status == 'open' || _quiz.status == 'in_progress';
+      if (_quiz.mode == 'scheduled' && _quiz.scheduledClose != null) {
+        if (DateTime.now().isAfter(_quiz.scheduledClose!)) return false;
+      }
+      return _quiz.status == 'open' || _quiz.status == 'in_progress' || _quiz.status == 'scheduled';
     }
-    if (_quiz.status != 'open') return false;
+    
     if (_attemptCount >= _attemptLimit) return false;
+    
+    if (_quiz.mode == 'scheduled') {
+      if (_quiz.status == 'closed' || _quiz.status == 'finished') return false;
+      final now = DateTime.now();
+      if (_quiz.scheduledOpen != null && now.isBefore(_quiz.scheduledOpen!)) return false;
+      if (_quiz.scheduledClose != null && now.isAfter(_quiz.scheduledClose!)) return false;
+      return true;
+    }
+
+    if (_quiz.status != 'open') return false;
     return true;
   }
 
@@ -462,14 +475,16 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
                       _hasInProgressAttempt
                           ? 'Lanjutkan Kuis'
                           : (_attemptCount >= _attemptLimit
-                              ? 'Attempt Limit Reached'
-                              : _quiz.status == 'scheduled'
-                                  ? 'Quiz Not Yet Open'
-                                  : (_quiz.status == 'closed' || _quiz.status == 'finished')
-                                      ? (_quiz.mode == 'live' ? 'Sesi Selesai' : 'Quiz Closed')
-                                      : _quiz.mode == 'live'
-                                          ? (_isLiveSessionOpen ? 'Join Live Quiz' : 'Menunggu Sesi Dimulai')
-                                          : 'Start Quiz'),
+                              ? 'Batas Percobaan Habis'
+                              : (_quiz.mode == 'scheduled' && _quiz.scheduledOpen != null && DateTime.now().isBefore(_quiz.scheduledOpen!))
+                                  ? 'Kuis Belum Terbuka'
+                                  : (_quiz.mode == 'scheduled' && _quiz.scheduledClose != null && DateTime.now().isAfter(_quiz.scheduledClose!))
+                                      ? 'Kuis Sudah Ditutup'
+                                      : (_quiz.status == 'closed' || _quiz.status == 'finished')
+                                          ? (_quiz.mode == 'live' ? 'Sesi Selesai' : 'Kuis Ditutup')
+                                          : _quiz.mode == 'live'
+                                              ? (_isLiveSessionOpen ? 'Gabung Kuis Live' : 'Menunggu Sesi')
+                                              : 'Mulai Kuis'),
                     ),
                   ),
                 ),
