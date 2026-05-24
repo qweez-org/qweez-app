@@ -115,6 +115,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _nextPage(int totalQuestions) {
+    FocusScope.of(context).unfocus();
     if (_currentIndex < totalQuestions - 1) {
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
@@ -124,6 +125,7 @@ class _QuizScreenState extends State<QuizScreen> {
   }
 
   void _previousPage() {
+    FocusScope.of(context).unfocus();
     if (_currentIndex > 0) {
       _pageController.previousPage(
         duration: const Duration(milliseconds: 300),

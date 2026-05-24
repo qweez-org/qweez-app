@@ -293,8 +293,8 @@ class _AnswerKeyScreenState extends State<AnswerKeyScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Multiple choice options with correct/incorrect indicators
-          if (type == 'multiple_choice' && options != null)
+          // Multiple choice and true/false options with correct/incorrect indicators
+          if ((type == 'multiple_choice' || type == 'true_false') && options != null)
             ...options.asMap().entries.map((entry) {
               final opt = Map<String, dynamic>.from(entry.value as Map);
               final optText = opt['text'] ?? '';
