@@ -3,7 +3,6 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../config/api_config.dart';
 import '../services/token_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../theme/app_theme.dart';
 import 'live_quiz_screen.dart';
@@ -46,8 +45,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
   }
 
   Future<void> _checkStoredSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final storedPin = prefs.getString('live_quiz_active_pin');
+    final storedPin = await TokenService.getActivePin();
     if (storedPin != null && storedPin.isNotEmpty && mounted) {
       _pinController.text = storedPin;
       _joinSession();
@@ -122,9 +120,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
           _participantCount = data['participantCount'] ?? 1;
         });
         // Store active pin
-        SharedPreferences.getInstance().then((prefs) {
-          prefs.setString('live_quiz_active_pin', _pinController.text.trim());
-        });
+        TokenService.setActivePin(_pinController.text.trim());
       }
     });
 
@@ -138,6 +134,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
         _socket?.disconnect();
         _socket?.dispose();
         _socket = null;
+        TokenService.clearActivePin();
       }
     });
 
@@ -206,9 +203,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
         // so QuizDetailScreen's await resolves and refreshes data
         if (mounted) Navigator.pop(context);
         // Clear stored pin after quiz navigation completes
-        SharedPreferences.getInstance().then((prefs) {
-          prefs.remove('live_quiz_active_pin');
-        });
+        TokenService.clearActivePin();
       }
     });
 
@@ -217,9 +212,7 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
         _socket?.disconnect();
         _socket?.dispose();
         _socket = null;
-        SharedPreferences.getInstance().then((prefs) {
-          prefs.remove('live_quiz_active_pin');
-        });
+        TokenService.clearActivePin();
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -257,8 +250,8 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
   @override
   void dispose() {
     _pinController.dispose();
-    // Only disconnect if we're still in the lobby (not navigated to quiz)
-    if (_isInLobby && !_isNavigatingToQuiz && _socket != null) {
+    // Only disconnect if we haven't navigated to the quiz yet
+    if (!_isNavigatingToQuiz && _socket != null) {
       _socket?.disconnect();
       _socket?.dispose();
     }

@@ -192,6 +192,12 @@ class QuizProvider with ChangeNotifier {
     }
   }
 
+  void cancelQuiz() {
+    _timer?.cancel();
+    _isLoading = false;
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _timer?.cancel();

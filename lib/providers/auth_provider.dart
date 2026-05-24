@@ -44,16 +44,22 @@ class AuthProvider with ChangeNotifier {
               _authError = 'This app is for students only. Please use a student account.';
               await TokenService.clearTokens();
             }
+          } else if (response.statusCode == 401 || response.statusCode == 403) {
+            _accessToken = null;
+            _refreshToken = null;
+            await TokenService.clearTokens();
+          }
+        } on SocketException catch (e) {
+          debugPrint('LOADUSER NETWORK ERROR: $e');
+        } catch (e) {
+          debugPrint('LOADUSER ERROR: $e');
+          if (e.toString().contains('SocketException') || e.toString().contains('TimeoutException')) {
+            // keep tokens on network error
           } else {
             _accessToken = null;
             _refreshToken = null;
             await TokenService.clearTokens();
           }
-        } catch (e) {
-          debugPrint('LOADUSER HTTP ERROR: $e');
-          _accessToken = null;
-          _refreshToken = null;
-          await TokenService.clearTokens();
         }
       }
     } catch (e) {
@@ -90,8 +96,6 @@ class AuthProvider with ChangeNotifier {
           _user = null;
           _authError = 'This app is for students only. Please use a student account.';
           await TokenService.clearTokens();
-          _isLoading = false;
-          notifyListeners();
           return false;
         }
 
@@ -99,24 +103,22 @@ class AuthProvider with ChangeNotifier {
           await TokenService.setTokens(accessToken: _accessToken!, refreshToken: _refreshToken!);
         }
 
-        _isLoading = false;
-        notifyListeners();
         return true;
       }
+      _authError = 'Invalid email or password.';
+      return false;
     } on SocketException catch (e) {
       debugPrint('LOGIN NETWORK ERROR: $e');
-      _isLoading = false;
       _authError = 'Cannot connect to server. Check your network and make sure the API is running.';
-      notifyListeners();
       return false;
     } catch (e) {
       debugPrint('LOGIN ERROR: $e');
+      _authError = 'Invalid email or password.';
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-
-    _isLoading = false;
-    _authError = 'Invalid email or password.';
-    notifyListeners();
-    return false;
   }
 
   Future<String?> register(String name, String email, String password) async {
@@ -145,28 +147,21 @@ class AuthProvider with ChangeNotifier {
           await TokenService.setTokens(accessToken: _accessToken!, refreshToken: _refreshToken!);
         }
 
-        _isLoading = false;
-        notifyListeners();
         return null; // null means success
       } else if (response.statusCode == 409) {
-        _isLoading = false;
-        notifyListeners();
         return 'Email is already registered.';
       } else {
-        _isLoading = false;
-        notifyListeners();
         return 'Registration failed. Please try again.';
       }
     } on SocketException catch (e) {
       debugPrint('REGISTER NETWORK ERROR: $e');
-      _isLoading = false;
-      notifyListeners();
       return 'Cannot connect to server. Check your network and make sure the API is running.';
     } catch (e) {
       debugPrint('REGISTER ERROR: $e');
+      return 'Registration failed. Please try again.';
+    } finally {
       _isLoading = false;
       notifyListeners();
-      return 'Registration failed. Please try again.';
     }
   }
 

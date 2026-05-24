@@ -165,7 +165,7 @@ class _QuizScreenState extends State<QuizScreen> {
             );
           } else {
             final canViewAnswerKey = result['canViewAnswerKey'] == true;
-            Navigator.pushReplacement(
+            Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => QuizResultScreen(
                 result: result,
@@ -173,7 +173,9 @@ class _QuizScreenState extends State<QuizScreen> {
                 previousBestScore: widget.previousBestScore,
                 canViewAnswerKey: canViewAnswerKey,
               )),
-            );
+            ).then((_) {
+              if (mounted) Navigator.pop(context);
+            });
           }
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -208,6 +210,7 @@ class _QuizScreenState extends State<QuizScreen> {
           ),
         );
         if (confirm == true && context.mounted) {
+          Provider.of<QuizProvider>(context, listen: false).cancelQuiz();
           Navigator.of(context).pop();
         }
       },

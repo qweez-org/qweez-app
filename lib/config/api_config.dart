@@ -22,6 +22,7 @@ class ApiConfig {
   /// Load optional runtime config from assets/config.json.
   /// Falls back to defaults if the file is missing.
   static Future<void> loadFromAssets() async {
+    if (!kDebugMode) return;
     try {
       final raw = await rootBundle.loadString('assets/config.json');
       final config = jsonDecode(raw) as Map<String, dynamic>;

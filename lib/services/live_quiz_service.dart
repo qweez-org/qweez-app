@@ -17,6 +17,7 @@ class LiveQuizService {
 
   /// Initialize the socket connection and start listening for live quiz events.
   Future<void> connect(BuildContext context) async {
+    disconnect(); // Ensure any stale socket is closed
 
     final token = await TokenService.getAccessToken();
     if (token == null) return;

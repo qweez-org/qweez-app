@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../config/api_config.dart';
@@ -7,11 +8,30 @@ import 'package:flutter/foundation.dart';
 class ApiService {
   static String get _baseUrl => ApiConfig.baseUrl;
 
+  static Completer<http.Response>? _refreshCompleter;
+
   static Future<http.Response> _retryWithRefresh(
     Future<http.Response> Function(String token) requestFn,
   ) async {
+    if (_refreshCompleter != null) {
+      final res = await _refreshCompleter!.future;
+      if (res.statusCode == 200) {
+        final token = await TokenService.getAccessToken();
+        if (token != null) {
+          return await requestFn(token);
+        }
+      }
+      return http.Response('Unauthorized', 401);
+    }
+
+    _refreshCompleter = Completer<http.Response>();
+
     final rt = await TokenService.getRefreshToken();
-    if (rt == null) return http.Response('Unauthorized', 401);
+    if (rt == null) {
+      _refreshCompleter?.complete(http.Response('Unauthorized', 401));
+      _refreshCompleter = null;
+      return http.Response('Unauthorized', 401);
+    }
 
     try {
       final refreshRes = await http.post(
@@ -31,15 +51,21 @@ class ApiService {
           } else {
             await TokenService.setAccessToken(newAccess);
           }
-          // Retry original request
+          _refreshCompleter?.complete(refreshRes);
+          _refreshCompleter = null;
           return await requestFn(newAccess);
         }
       }
+      
+      _refreshCompleter?.complete(refreshRes);
     } catch (e) {
       debugPrint('ApiService token refresh error: $e');
+      if (!(_refreshCompleter?.isCompleted ?? true)) {
+        _refreshCompleter?.complete(http.Response('Unauthorized', 401));
+      }
     }
 
-    // If refresh failed, clear tokens
+    _refreshCompleter = null;
     await TokenService.clearTokens();
     return http.Response('Unauthorized', 401);
   }
