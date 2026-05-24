@@ -178,13 +178,16 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
     return '${local.day}/${local.month}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 
-  String _formatRemaining(DateTime? closeAt) {
-    if (closeAt == null) return '-';
+  String _formatRemaining(DateTime? targetTime, {bool isOpenTime = false}) {
+    if (targetTime == null) return '-';
     final now = DateTime.now();
-    if (closeAt.isBefore(now)) return 'Sudah ditutup';
-    final diff = closeAt.difference(now);
-    final hours = diff.inHours;
+    if (targetTime.isBefore(now)) return isOpenTime ? 'Sudah terbuka' : 'Sudah ditutup';
+    final diff = targetTime.difference(now);
+    final days = diff.inDays;
+    final hours = diff.inHours % 24;
     final minutes = diff.inMinutes % 60;
+    
+    if (days > 0) return '${days}h ${hours}j ${minutes}m';
     if (hours > 0) return '${hours}j ${minutes}m';
     return '${minutes}m';
   }
@@ -264,11 +267,14 @@ class _QuizDetailScreenState extends State<QuizDetailScreen> {
                     _quiz.allowBacktrack ? 'Ya (bisa kembali)' : 'Tidak (jawaban terkunci)',
                   ),
                 if (_quiz.scheduledOpen != null)
-                  _buildInfoCard(Icons.event, 'Opens', _formatDate(_quiz.scheduledOpen)),
+                  _buildInfoCard(Icons.event, 'Terbuka', _formatDate(_quiz.scheduledOpen)),
                 if (_quiz.scheduledClose != null)
-                  _buildInfoCard(Icons.event_busy, 'Closes', _formatDate(_quiz.scheduledClose)),
-                if (_quiz.mode == 'scheduled' && _quiz.scheduledClose != null) ...[
-                  _buildInfoCard(Icons.hourglass_bottom, 'Sisa waktu', _formatRemaining(_quiz.scheduledClose)),
+                  _buildInfoCard(Icons.event_busy, 'Ditutup', _formatDate(_quiz.scheduledClose)),
+                if (_quiz.mode == 'scheduled') ...[
+                  if (_quiz.scheduledOpen != null && DateTime.now().isBefore(_quiz.scheduledOpen!))
+                    _buildInfoCard(Icons.hourglass_top, 'Terbuka dalam', _formatRemaining(_quiz.scheduledOpen, isOpenTime: true))
+                  else if (_quiz.scheduledClose != null && DateTime.now().isBefore(_quiz.scheduledClose!))
+                    _buildInfoCard(Icons.hourglass_bottom, 'Ditutup dalam', _formatRemaining(_quiz.scheduledClose)),
                 ],
                 if (_quiz.description != null && _quiz.description!.isNotEmpty) ...[
                   const SizedBox(height: 16),
