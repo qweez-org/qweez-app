@@ -179,6 +179,7 @@ class AuthProvider with ChangeNotifier {
     _refreshToken = null;
     _user = null;
     await TokenService.clearTokens();
+    await TokenService.clearActivePin();
     notifyListeners();
   }
 }

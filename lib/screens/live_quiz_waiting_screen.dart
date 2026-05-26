@@ -77,6 +77,10 @@ class _LiveQuizWaitingScreenState extends State<LiveQuizWaitingScreen> {
 
     final serverUrl = ApiConfig.baseUrl.replaceAll('/api', '');
 
+    // Dispose any existing socket to prevent leaks on rapid re-join
+    _socket?.disconnect();
+    _socket?.dispose();
+
     _socket = io.io(
       serverUrl,
       io.OptionBuilder()

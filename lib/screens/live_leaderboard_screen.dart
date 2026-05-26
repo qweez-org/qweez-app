@@ -19,7 +19,7 @@ class LiveLeaderboardScreen extends StatefulWidget {
 }
 
 class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
-  late io.Socket _socket;
+  io.Socket? _socket;
   bool _isLoading = true;
   String? _errorMessage;
   List<Map<String, dynamic>> _leaderboard = [];
@@ -73,7 +73,7 @@ class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
     if (token == null) return;
 
     final serverUrl = ApiConfig.baseUrl.replaceAll('/api', '');
-    _socket = io.io(
+    final socket = io.io(
       serverUrl,
       io.OptionBuilder()
           .setTransports(['websocket', 'polling'])
@@ -81,18 +81,19 @@ class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
           .setAuth({'token': token})
           .build(),
     );
+    _socket = socket;
 
-    _socket.connect();
+    socket.connect();
 
-    _socket.onConnect((_) {
-      _socket.emit('join:quiz', widget.quiz.id);
+    socket.onConnect((_) {
+      socket.emit('join:quiz', widget.quiz.id);
     });
 
-    _socket.on('live:leaderboard_update', (_) {
+    socket.on('live:leaderboard_update', (_) {
       _fetchLeaderboard();
     });
     
-    _socket.on('live:cancelled', (_) {
+    socket.on('live:cancelled', (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('The teacher has ended the live quiz.')),
@@ -103,11 +104,14 @@ class _LiveLeaderboardScreenState extends State<LiveLeaderboardScreen> {
 
   @override
   void dispose() {
-    if (_socket.connected) {
-      _socket.emit('leave:quiz', widget.quiz.id);
-      _socket.disconnect();
+    final s = _socket;
+    if (s != null) {
+      if (s.connected) {
+        s.emit('leave:quiz', widget.quiz.id);
+        s.disconnect();
+      }
+      s.dispose();
     }
-    _socket.dispose();
     super.dispose();
   }
 

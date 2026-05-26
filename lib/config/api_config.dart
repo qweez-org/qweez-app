@@ -3,8 +3,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class ApiConfig {
-  // Default for Android Emulator. Override with setBaseUrl() for physical devices.
-  static String _baseUrl = 'http://10.0.2.2:5000/api';
+  // Build-time override: flutter run --dart-define=API_URL=https://api.example.com/api
+  static const String _dartDefineUrl = String.fromEnvironment('API_URL');
+
+  // Default: use --dart-define in release, emulator IP in debug.
+  static String _baseUrl = _dartDefineUrl.isNotEmpty
+      ? _dartDefineUrl
+      : (kDebugMode ? 'http://10.0.2.2:5000/api' : 'http://10.0.2.2:5000/api');
 
   static String get baseUrl => _baseUrl;
 
@@ -21,8 +26,9 @@ class ApiConfig {
 
   /// Load optional runtime config from assets/config.json.
   /// Falls back to defaults if the file is missing.
+  /// Works in both debug and release builds so the app can be
+  /// configured without recompiling (e.g. for staging/production APKs).
   static Future<void> loadFromAssets() async {
-    if (!kDebugMode) return;
     try {
       final raw = await rootBundle.loadString('assets/config.json');
       final config = jsonDecode(raw) as Map<String, dynamic>;
@@ -34,8 +40,10 @@ class ApiConfig {
       } else if (config['apiUrl'] != null && (config['apiUrl'] as String).isNotEmpty) {
         setBaseUrl(config['apiUrl'] as String);
         debugPrint('[ApiConfig] Loaded from assets: apiUrl=$baseUrl');
+      } else if (_dartDefineUrl.isNotEmpty) {
+        debugPrint('[ApiConfig] Using --dart-define API_URL: $baseUrl');
       } else {
-        debugPrint('[ApiConfig] assets/config.json has empty apiHost/apiUrl — using default: $baseUrl');
+        debugPrint('[ApiConfig] No config override found — using default: $baseUrl');
       }
     } catch (e) {
       debugPrint('[ApiConfig] Failed to load assets/config.json — using default: $baseUrl ($e)');

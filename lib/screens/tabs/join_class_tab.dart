@@ -40,7 +40,7 @@ class _JoinClassTabState extends State<JoinClassTab> {
         _codeController.clear();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to join class. Please check the code.'), backgroundColor: AppTheme.error),
+          SnackBar(content: Text(classProvider.errorMessage ?? 'Failed to join class. Please check the code.'), backgroundColor: AppTheme.error),
         );
       }
     }

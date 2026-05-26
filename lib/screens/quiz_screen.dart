@@ -105,6 +105,8 @@ class _QuizScreenState extends State<QuizScreen> {
 
   @override
   void dispose() {
+    // Cancel quiz timer to prevent auto-submit after screen is disposed
+    Provider.of<QuizProvider>(context, listen: false).cancelQuiz();
     _pageController.dispose();
     if (_socket != null && _socket!.connected) {
       _socket!.emit('leave:quiz', widget.quiz.id);
