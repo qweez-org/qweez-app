@@ -2,5 +2,5 @@
   "_comment": "Set apiHost to your dev machine IP (ip addr show). Leave empty to use Android emulator default (10.0.2.2).",
   "apiHost": "",
   "apiPort": 5000,
-  "apiUrl": ""
+  "apiUrl": "https://qweez-api-production.up.railway.app/api"
 }
