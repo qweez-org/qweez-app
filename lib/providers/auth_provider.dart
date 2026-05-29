@@ -182,4 +182,19 @@ class AuthProvider with ChangeNotifier {
     await TokenService.clearActivePin();
     notifyListeners();
   }
+
+  /// Update display name. Returns null on success, error string on failure.
+  Future<String?> updateProfile(String name) async {
+    try {
+      final response = await ApiService.patch('/users/me', body: {'name': name.trim()});
+      if (response.statusCode == 200) {
+        _user = _user?.copyWith(name: name.trim());
+        notifyListeners();
+        return null;
+      }
+      return 'Gagal memperbarui profil. Silakan coba lagi.';
+    } catch (_) {
+      return 'Tidak dapat terhubung ke server.';
+    }
+  }
 }

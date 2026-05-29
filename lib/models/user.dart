@@ -19,4 +19,13 @@ class User {
       role: json['role'] ?? '',
     );
   }
+
+  User copyWith({String? name}) {
+    return User(
+      id: id,
+      name: name ?? this.name,
+      email: email,
+      role: role,
+    );
+  }
 }
