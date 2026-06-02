@@ -13,6 +13,9 @@ class QuizProvider with ChangeNotifier {
   Map<String, String> _answers = {}; // questionId -> answer
   bool _isLoading = false;
   String? _errorMessage;
+  Map<String, dynamic>? _submissionResult;
+  bool _wasAutoSubmitted = false;
+  Future<Map<String, dynamic>?>? _submitFuture;
 
   Timer? _timer;
   int _remainingSeconds = 0;
@@ -25,6 +28,8 @@ class QuizProvider with ChangeNotifier {
   String? get errorMessage => _errorMessage;
   int get remainingSeconds => _remainingSeconds;
   int get resumeIndex => _resumeIndex;
+  Map<String, dynamic>? get submissionResult => _submissionResult;
+  bool get wasAutoSubmitted => _wasAutoSubmitted;
 
   Future<bool> startQuiz(QuizModel quiz) async {
     // Reset immediately before any async work so no stale data is rendered
@@ -35,14 +40,20 @@ class QuizProvider with ChangeNotifier {
     _errorMessage = null;
     _isLoading = true;
     _resumeIndex = 0;
-    notifyListeners();   // triggers rebuild with empty state
+    _submissionResult = null;
+    _wasAutoSubmitted = false;
+    _submitFuture = null;
+    notifyListeners(); // triggers rebuild with empty state
 
     try {
       // 1. Start or resume attempt
-      final startRes = await ApiService.post('/attempts/quizzes/${quiz.id}/start');
+      final startRes = await ApiService.post(
+        '/attempts/quizzes/${quiz.id}/start',
+      );
 
       if (startRes.statusCode != 200 && startRes.statusCode != 201) {
-        final errorMsg = json.decode(startRes.body)['message'] ?? 'Failed to start quiz';
+        final errorMsg =
+            json.decode(startRes.body)['message'] ?? 'Failed to start quiz';
         throw Exception(errorMsg);
       }
 
@@ -51,13 +62,15 @@ class QuizProvider with ChangeNotifier {
       final isResuming = startData['message'] == 'Resuming existing attempt';
 
       // 2. Fetch existing answers if resuming
-      final attemptRes = await ApiService.get('/attempts/${_currentAttempt!.id}');
+      final attemptRes = await ApiService.get(
+        '/attempts/${_currentAttempt!.id}',
+      );
 
       if (attemptRes.statusCode == 200) {
         final attemptData = json.decode(attemptRes.body);
         final List<dynamic> existingAnswers = attemptData['answers'] ?? [];
         _answers = {
-          for (var a in existingAnswers) a['questionId']: a['answer']
+          for (var a in existingAnswers) a['questionId']: a['answer'],
         };
       }
 
@@ -65,12 +78,16 @@ class QuizProvider with ChangeNotifier {
       _resumeIndex = 0;
 
       // 3. Fetch questions
-      final questionsRes = await ApiService.get('/quizzes/${quiz.id}/questions');
+      final questionsRes = await ApiService.get(
+        '/quizzes/${quiz.id}/questions',
+      );
 
       if (questionsRes.statusCode == 200) {
         final questionsData = json.decode(questionsRes.body);
         final List<dynamic> questionsList = questionsData['questions'] ?? [];
-        _questions = questionsList.map((q) => QuestionModel.fromJson(q)).toList();
+        _questions = questionsList
+            .map((q) => QuestionModel.fromJson(q))
+            .toList();
 
         if (quiz.shuffleOptions) {
           for (var q in _questions) {
@@ -86,8 +103,12 @@ class QuizProvider with ChangeNotifier {
 
       // If resuming, find first unanswered question
       if (isResuming) {
-        final firstUnanswered = _questions.indexWhere((q) => !_answers.containsKey(q.id));
-        _resumeIndex = firstUnanswered >= 0 ? firstUnanswered : _questions.length - 1;
+        final firstUnanswered = _questions.indexWhere(
+          (q) => !_answers.containsKey(q.id),
+        );
+        _resumeIndex = firstUnanswered >= 0
+            ? firstUnanswered
+            : _questions.length - 1;
       } else {
         _resumeIndex = 0;
       }
@@ -100,7 +121,8 @@ class QuizProvider with ChangeNotifier {
       return true;
     } on SocketException catch (e) {
       debugPrint('START QUIZ NETWORK ERROR: $e');
-      _errorMessage = 'Cannot connect to server. Make sure the API is running and you are on the same WiFi.';
+      _errorMessage =
+          'Cannot connect to server. Make sure the API is running and you are on the same WiFi.';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -116,13 +138,15 @@ class QuizProvider with ChangeNotifier {
     _timer?.cancel();
     if (_currentAttempt == null) return;
 
-    final elapsed = DateTime.now().difference(_currentAttempt!.startedAt).inSeconds;
+    final elapsed = DateTime.now()
+        .difference(_currentAttempt!.startedAt)
+        .inSeconds;
     final totalSeconds = durationMinutes * 60;
     _remainingSeconds = totalSeconds - elapsed;
 
     if (_remainingSeconds <= 0) {
       _remainingSeconds = 0;
-      submitQuiz(); // Auto submit
+      submitQuiz(autoTriggered: true); // Auto submit
       return;
     }
 
@@ -132,7 +156,7 @@ class QuizProvider with ChangeNotifier {
         notifyListeners();
       } else {
         timer.cancel();
-        submitQuiz(); // Auto submit
+        submitQuiz(autoTriggered: true); // Auto submit
       }
     });
   }
@@ -144,26 +168,44 @@ class QuizProvider with ChangeNotifier {
     try {
       if (_currentAttempt == null) return;
 
-      await ApiService.put('/attempts/${_currentAttempt!.id}/answers', body: {
-        'answers': [
-          {'questionId': questionId, 'answer': answer}
-        ]
-      });
+      await ApiService.put(
+        '/attempts/${_currentAttempt!.id}/answers',
+        body: {
+          'answers': [
+            {'questionId': questionId, 'answer': answer},
+          ],
+        },
+      );
     } catch (e) {
       // Save locally even if network fails — answer is already in _answers map
-
     }
   }
 
-  Future<Map<String, dynamic>?> submitQuiz() async {
+  Future<Map<String, dynamic>?> submitQuiz({bool autoTriggered = false}) async {
+    if (_submitFuture != null) {
+      return _submitFuture!;
+    }
+
+    _submitFuture = _performSubmit(autoTriggered: autoTriggered);
+    final result = await _submitFuture!;
+    _submitFuture = null;
+    return result;
+  }
+
+  Future<Map<String, dynamic>?> _performSubmit({
+    required bool autoTriggered,
+  }) async {
     _timer?.cancel();
     _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
 
     try {
       if (_currentAttempt == null) throw Exception('No current attempt');
 
-      final res = await ApiService.post('/attempts/${_currentAttempt!.id}/submit');
+      final res = await ApiService.post(
+        '/attempts/${_currentAttempt!.id}/submit',
+      );
 
       _isLoading = false;
       notifyListeners();
@@ -171,6 +213,8 @@ class QuizProvider with ChangeNotifier {
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         _currentAttempt = AttemptModel.fromJson(data['attempt']);
+        _submissionResult = data;
+        _wasAutoSubmitted = autoTriggered;
         return data; // contains totalPoints, earnedPoints
       } else {
         _errorMessage = 'Failed to submit quiz';

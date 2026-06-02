@@ -24,6 +24,7 @@ class _QuizScreenState extends State<QuizScreen> {
   final PageController _pageController = PageController();
   int _currentIndex = 0;
   io.Socket? _socket;
+  bool _handledAutoSubmit = false;
 
   @override
   void initState() {
@@ -64,7 +65,9 @@ class _QuizScreenState extends State<QuizScreen> {
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
             title: const Text('Live Quiz Cancelled'),
-            content: const Text('The teacher has ended this quiz session early.'),
+            content: const Text(
+              'The teacher has ended this quiz session early.',
+            ),
             actions: [
               TextButton(
                 onPressed: () {
@@ -72,7 +75,7 @@ class _QuizScreenState extends State<QuizScreen> {
                   Navigator.pop(context); // Go back
                 },
                 child: const Text('OK'),
-              )
+              ),
             ],
           ),
         );
@@ -91,7 +94,9 @@ class _QuizScreenState extends State<QuizScreen> {
     final success = await provider.startQuiz(widget.quiz);
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(provider.errorMessage ?? 'Failed to start quiz')),
+        SnackBar(
+          content: Text(provider.errorMessage ?? 'Failed to start quiz'),
+        ),
       );
       Navigator.pop(context);
       return;
@@ -138,16 +143,24 @@ class _QuizScreenState extends State<QuizScreen> {
 
   Future<void> _submitQuiz() async {
     final provider = Provider.of<QuizProvider>(context, listen: false);
-    
+
     // Show confirmation dialog
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Submit Quiz?'),
-        content: const Text('Are you sure you want to submit? You cannot change your answers after submission.'),
+        content: const Text(
+          'Are you sure you want to submit? You cannot change your answers after submission.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Submit')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Submit'),
+          ),
         ],
       ),
     );
@@ -163,18 +176,23 @@ class _QuizScreenState extends State<QuizScreen> {
             }
             Navigator.pushReplacement(
               context,
-              MaterialPageRoute(builder: (_) => LiveLeaderboardScreen(quiz: widget.quiz, result: result)),
+              MaterialPageRoute(
+                builder: (_) =>
+                    LiveLeaderboardScreen(quiz: widget.quiz, result: result),
+              ),
             );
           } else {
             final canViewAnswerKey = result['canViewAnswerKey'] == true;
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => QuizResultScreen(
-                result: result,
-                quiz: widget.quiz,
-                previousBestScore: widget.previousBestScore,
-                canViewAnswerKey: canViewAnswerKey,
-              )),
+              MaterialPageRoute(
+                builder: (_) => QuizResultScreen(
+                  result: result,
+                  quiz: widget.quiz,
+                  previousBestScore: widget.previousBestScore,
+                  canViewAnswerKey: canViewAnswerKey,
+                ),
+              ),
             ).then((_) {
               if (mounted) Navigator.pop(context);
             });
@@ -204,10 +222,21 @@ class _QuizScreenState extends State<QuizScreen> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Leave Quiz?'),
-            content: const Text('Your progress is saved, but the timer will continue running.'),
+            content: const Text(
+              'Your progress is saved, but the timer will continue running.',
+            ),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Stay')),
-              TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Leave', style: TextStyle(color: AppTheme.error))),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Stay'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text(
+                  'Leave',
+                  style: TextStyle(color: AppTheme.error),
+                ),
+              ),
             ],
           ),
         );
@@ -227,6 +256,28 @@ class _QuizScreenState extends State<QuizScreen> {
         body: SafeArea(
           child: Consumer<QuizProvider>(
             builder: (context, provider, child) {
+              if (provider.wasAutoSubmitted &&
+                  provider.submissionResult != null &&
+                  !_handledAutoSubmit) {
+                _handledAutoSubmit = true;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  final result = provider.submissionResult!;
+                  final canViewAnswerKey = result['canViewAnswerKey'] == true;
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => QuizResultScreen(
+                        result: result,
+                        quiz: widget.quiz,
+                        previousBestScore: widget.previousBestScore,
+                        canViewAnswerKey: canViewAnswerKey,
+                      ),
+                    ),
+                  );
+                });
+              }
+
               if (provider.isLoading && provider.questions.isEmpty) {
                 return const Center(child: CircularProgressIndicator());
               }
@@ -242,22 +293,35 @@ class _QuizScreenState extends State<QuizScreen> {
                 children: [
                   // Header (Timer & Progress)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 16,
+                    ),
                     decoration: BoxDecoration(
                       color: AppTheme.surfaceCard,
-                      border: Border(bottom: BorderSide(color: AppTheme.gray200)),
+                      border: Border(
+                        bottom: BorderSide(color: AppTheme.gray200),
+                      ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           'Question ${_currentIndex + 1} of ${questions.length}',
-                          style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textSecondary,
+                          ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                            color: provider.remainingSeconds < 60 ? AppTheme.error.withValues(alpha: 0.08) : AppTheme.primary50,
+                            color: provider.remainingSeconds < 60
+                                ? AppTheme.error.withValues(alpha: 0.08)
+                                : AppTheme.primary50,
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Row(
@@ -265,14 +329,18 @@ class _QuizScreenState extends State<QuizScreen> {
                               Icon(
                                 Icons.timer_outlined,
                                 size: 16,
-                                color: provider.remainingSeconds < 60 ? AppTheme.error : AppTheme.primary600,
+                                color: provider.remainingSeconds < 60
+                                    ? AppTheme.error
+                                    : AppTheme.primary600,
                               ),
                               const SizedBox(width: 6),
                               Text(
                                 _formatTime(provider.remainingSeconds),
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: provider.remainingSeconds < 60 ? AppTheme.error : AppTheme.primary600,
+                                  color: provider.remainingSeconds < 60
+                                      ? AppTheme.error
+                                      : AppTheme.primary600,
                                 ),
                               ),
                             ],
@@ -281,26 +349,34 @@ class _QuizScreenState extends State<QuizScreen> {
                       ],
                     ),
                   ),
-                  
+
                   // Linear Progress
                   LinearProgressIndicator(
                     value: (_currentIndex + 1) / questions.length,
                     backgroundColor: AppTheme.gray200,
-                    valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primary400),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      AppTheme.primary400,
+                    ),
                   ),
                   TweenAnimationBuilder<double>(
                     duration: const Duration(seconds: 1),
                     curve: Curves.linear,
                     tween: Tween<double>(
-                      begin: provider.remainingSeconds / (widget.quiz.duration * 60),
-                      end: provider.remainingSeconds / (widget.quiz.duration * 60),
+                      begin:
+                          provider.remainingSeconds /
+                          (widget.quiz.duration * 60),
+                      end:
+                          provider.remainingSeconds /
+                          (widget.quiz.duration * 60),
                     ),
                     builder: (context, value, _) {
                       return LinearProgressIndicator(
                         value: value,
                         backgroundColor: AppTheme.primary100,
                         valueColor: AlwaysStoppedAnimation<Color>(
-                          provider.remainingSeconds <= 60 ? AppTheme.error : AppTheme.primary500,
+                          provider.remainingSeconds <= 60
+                              ? AppTheme.error
+                              : AppTheme.primary500,
                         ),
                         minHeight: 3,
                       );
@@ -311,7 +387,8 @@ class _QuizScreenState extends State<QuizScreen> {
                   Expanded(
                     child: PageView.builder(
                       controller: _pageController,
-                      physics: const NeverScrollableScrollPhysics(), // Disable swipe
+                      physics:
+                          const NeverScrollableScrollPhysics(), // Disable swipe
                       onPageChanged: (idx) {
                         setState(() {
                           _currentIndex = idx;
@@ -334,7 +411,7 @@ class _QuizScreenState extends State<QuizScreen> {
                           color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 10,
                           offset: const Offset(0, -5),
-                        )
+                        ),
                       ],
                     ),
                     child: Row(
@@ -344,28 +421,50 @@ class _QuizScreenState extends State<QuizScreen> {
                             child: OutlinedButton(
                               onPressed: _previousPage,
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                side: const BorderSide(color: AppTheme.primary400),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                side: const BorderSide(
+                                  color: AppTheme.primary400,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
-                              child: const Text('Previous', style: TextStyle(color: AppTheme.primary400)),
+                              child: const Text(
+                                'Previous',
+                                style: TextStyle(color: AppTheme.primary400),
+                              ),
                             ),
                           )
                         else
                           const Spacer(),
-                        
+
                         const SizedBox(width: 16),
-                        
+
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: isLastQuestion ? _submitQuiz : () => _nextPage(questions.length),
+                            onPressed:
+                                provider.isLoading ||
+                                    provider.remainingSeconds <= 0
+                                ? null
+                                : (isLastQuestion
+                                      ? _submitQuiz
+                                      : () => _nextPage(questions.length)),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: isLastQuestion ? AppTheme.textPrimary : AppTheme.primary400,
+                              backgroundColor: isLastQuestion
+                                  ? AppTheme.textPrimary
+                                  : AppTheme.primary400,
                               padding: const EdgeInsets.symmetric(vertical: 16),
                             ),
                             child: Text(
-                              isLastQuestion ? 'Submit' : 'Next',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                              provider.remainingSeconds <= 0
+                                  ? 'Submitting...'
+                                  : (isLastQuestion ? 'Submit' : 'Next'),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
@@ -388,153 +487,209 @@ class _QuizScreenState extends State<QuizScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppTheme.background,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              '${question.points} Points',
-              style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.textSecondary, fontSize: 12),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            question.text,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, height: 1.5, color: AppTheme.textPrimary),
-          ),
-          const SizedBox(height: 32),
-          if (question.type == 'multiple_choice' && question.options != null)
-            ...question.options!.map((option) {
-              final isSelected = provider.answers[question.id] == option.text;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: InkWell(
-                  onTap: () => provider.saveAnswer(question.id, option.text),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppTheme.primary50 : AppTheme.surfaceCard,
-                      border: Border.all(
-                        color: isSelected ? AppTheme.primary400 : AppTheme.gray300,
-                        width: isSelected ? 2 : 1,
-                      ),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: AppTheme.background,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${question.points} Points',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                question.text,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  height: 1.5,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 32),
+              if (question.type == 'multiple_choice' &&
+                  question.options != null)
+                ...question.options!.map((option) {
+                  final isSelected =
+                      provider.answers[question.id] == option.text;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: InkWell(
+                      onTap: () =>
+                          provider.saveAnswer(question.id, option.text),
                       borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: isSelected ? AppTheme.primary400 : AppTheme.gray400,
-                              width: 2,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppTheme.primary50
+                              : AppTheme.surfaceCard,
+                          border: Border.all(
+                            color: isSelected
+                                ? AppTheme.primary400
+                                : AppTheme.gray300,
+                            width: isSelected ? 2 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isSelected
+                                      ? AppTheme.primary400
+                                      : AppTheme.gray400,
+                                  width: 2,
+                                ),
+                              ),
+                              child: isSelected
+                                  ? Center(
+                                      child: Container(
+                                        width: 12,
+                                        height: 12,
+                                        decoration: const BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: AppTheme.primary400,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
                             ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Text(
+                                option.text,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: isSelected
+                                      ? AppTheme.primary700
+                                      : AppTheme.textPrimary,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                })
+              else if (question.type == 'true_false' &&
+                  question.options != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Row(
+                    children: question.options!.map((option) {
+                      final isSelected =
+                          provider.answers[question.id] == option.text;
+                      final isBenar = option.text == 'Benar';
+
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            left: isBenar ? 0 : 8,
+                            right: isBenar ? 8 : 0,
                           ),
                           child: isSelected
-                              ? Center(
-                                  child: Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: const BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: AppTheme.primary400,
+                              ? ElevatedButton.icon(
+                                  onPressed: () => provider.saveAnswer(
+                                    question.id,
+                                    option.text,
+                                  ),
+                                  icon: Icon(
+                                    isBenar ? Icons.check : Icons.close,
+                                    size: 20,
+                                  ),
+                                  label: Text(
+                                    option.text,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.primary400,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 20,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
                                 )
-                              : null,
+                              : OutlinedButton.icon(
+                                  onPressed: () => provider.saveAnswer(
+                                    question.id,
+                                    option.text,
+                                  ),
+                                  icon: Icon(
+                                    isBenar ? Icons.check : Icons.close,
+                                    size: 20,
+                                    color: AppTheme.primary500,
+                                  ),
+                                  label: Text(
+                                    option.text,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppTheme.primary500,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(
+                                      color: AppTheme.primary400,
+                                      width: 2,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 20,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Text(
-                            option.text,
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: isSelected ? AppTheme.primary700 : AppTheme.textPrimary,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    }).toList(),
                   ),
-                ),
-              );
-            })
-          else if (question.type == 'true_false' && question.options != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Row(
-                children: question.options!.map((option) {
-                  final isSelected = provider.answers[question.id] == option.text;
-                  final isBenar = option.text == 'Benar';
-                  
-                  return Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.only(
-                        left: isBenar ? 0 : 8,
-                        right: isBenar ? 8 : 0,
-                      ),
-                      child: isSelected
-                          ? ElevatedButton.icon(
-                              onPressed: () => provider.saveAnswer(question.id, option.text),
-                              icon: Icon(isBenar ? Icons.check : Icons.close, size: 20),
-                              label: Text(
-                                option.text,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppTheme.primary400,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 20),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            )
-                          : OutlinedButton.icon(
-                              onPressed: () => provider.saveAnswer(question.id, option.text),
-                              icon: Icon(isBenar ? Icons.check : Icons.close, size: 20, color: AppTheme.primary500),
-                              label: Text(
-                                option.text,
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primary500),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: AppTheme.primary400, width: 2),
-                                padding: const EdgeInsets.symmetric(vertical: 20),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
+                )
+              else if (question.type == 'short_answer')
+                TextFormField(
+                  initialValue: provider.answers[question.id],
+                  maxLines: 1,
+                  decoration: InputDecoration(
+                    hintText: 'Ketik jawaban Anda di sini...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                  );
-                }).toList(),
-              ),
-            )
-          else if (question.type == 'short_answer')
-            TextFormField(
-              initialValue: provider.answers[question.id],
-              maxLines: 1,
-              decoration: InputDecoration(
-                hintText: 'Ketik jawaban Anda di sini...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-              onChanged: (val) {
-                // Save after a short delay or immediately (debounce would be better, but immediately is fine for now)
-                provider.saveAnswer(question.id, val);
-              },
-            ),
-        ],
-      ),
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  onChanged: (val) {
+                    // Save after a short delay or immediately (debounce would be better, but immediately is fine for now)
+                    provider.saveAnswer(question.id, val);
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );
