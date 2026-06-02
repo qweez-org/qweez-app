@@ -60,7 +60,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     const Text('Request sent!', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 8),
                     const Text(
-                      'If an account with that email exists, a reset link has been sent. Check the server console for the token (dev mode).',
+                      'Request received, but automatic password reset is not fully active in this deployment yet. Please contact the admin or system owner for help.',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.grey),
                     ),
@@ -75,6 +75,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Text(
+                      'Fitur reset password masih belum aktif penuh di deployment saat ini. Jika lupa password, sementara hubungi admin atau pembuat akun.',
+                      style: TextStyle(color: Colors.orange.shade900, fontSize: 13),
+                    ),
+                  ),
                   Text(
                     'Enter your email and we will send you a reset link.',
                     style: TextStyle(color: Colors.grey.shade700, fontSize: 14),

@@ -149,7 +149,8 @@ class AuthProvider with ChangeNotifier {
 
         return null; // null means success
       } else if (response.statusCode == 409) {
-        return 'Email is already registered.';
+        final data = json.decode(response.body);
+        return data['message']?.toString() ?? 'Email is already registered.';
       } else {
         return 'Registration failed. Please try again.';
       }

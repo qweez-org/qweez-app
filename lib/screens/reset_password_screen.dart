@@ -97,6 +97,19 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.shade200),
+                    ),
+                    child: Text(
+                      'Fitur reset password masih belum aktif penuh di deployment saat ini. Jika proses ini gagal, gunakan bantuan admin atau pengelola sistem.',
+                      style: TextStyle(color: Colors.orange.shade900, fontSize: 13),
+                    ),
+                  ),
                   Text(
                     'Create a new password for your account.',
                     style: TextStyle(color: Colors.grey.shade700, fontSize: 14),
